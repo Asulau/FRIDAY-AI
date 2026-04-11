@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F.R.I.D.A.Y. â Personal AI Assistant</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+@font-face{font-family:'Orbitron';src:url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap')}
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap');
+:root{--cyan:#00f0ff;--cyan-dim:#00f0ff55;--bg:#0a0e17;--panel:#0d1520;--border:#0f2a3a;--text:#c0e8f0;--green:#00ff88;--red:#ff3355;--orange:#ffaa00;--purple:#aa55ff}
+body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+/* LEFT PANEL */
+.left-panel{width:200px;padding:12px;display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--border);flex-shrink:0}
+.panel-box{border:1px solid var(--border);padding:10px;border-radius:4px;background:var(--panel)}
+.panel-title{font-family:'Orbitron',sans-serif;font-size:10px;color:var(--cyan);margin-bottom:8px;letter-spacing:2px}
+.stat-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.stat-val{color:var(--cyan);font-weight:bold}
+.stat-val.green{color:var(--green)}
+.stat-val.red{color:var(--red)}
+.stat-val.orange{color:var(--orange)}
+/* MAIN AREA */
+.main-area{flex:1;display:flex;flex-direction:column;position:relative}
+/* HEADER */
+.header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border)}
+.clock{font-family:'Orbitron',sans-serif;font-size:22px;color:var(--cyan);text-align:center}
+.clock-date{font-size:10px;color:var(--text);opacity:.6;text-align:center}
+.title{font-family:'Orbitron',sans-serif;font-size:20px;letter-spacing:8px;color:var(--cyan)}
+.header-btns{display:flex;gap:8px}
+.header-btn{background:none;border:1px solid var(--border);color:var(--cyan);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
+.header-btn:hover{background:var(--cyan-dim);border-color:var(--cyan)}
+/* CHAT */
+.chat-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:85%;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.5;animation:fadeIn .3s}
+.msg.friday{background:linear-gradient(135deg,#0d1a2a,#0f2030);border:1px solid var(--border);align-self:flex-start}
+.msg.friday .msg-label{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--cyan);letter-spacing:3px;margin-bottom:6px;opacity:.6}
+.msg.user{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #1a3050;align-self:flex-end;color:#e0e0e0}
+.msg.user .msg-label{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--orange);letter-spacing:3px;margin-bottom:6px;opacity:.6;text-align:right}
+.msg.error{border-color:var(--red);background:#1a0a0f}
+.msg .tool-badge{display:inline-block;background:var(--purple);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;margin:4px 2px;font-family:'Orbitron',sans-serif}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* INPUT */
+.input-area{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center}
+.input-area input{flex:1;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:13px;outline:none}
+.input-area input:focus{border-color:var(--cyan);box-shadow:0 0 10px var(--cyan-dim)}
+.input-area input::placeholder{color:#3a5060}
+.send-btn,.mic-btn{background:none;border:1px solid var(--border);color:var(--cyan);width:40px;height:40px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s}
+.send-btn:hover,.mic-btn:hover{background:var(--cyan-dim);border-color:var(--cyan)}
+.mic-btn.recording{background:var(--red);border-color:var(--red);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+/* BOTTOM BAR */
+.bottom-bar{display:flex;gap:8px;justify-content:center;padding:8px;border-top:1px solid var(--border)}
+.connector-pill{font-family:'Orbitron',sans-serif;font-size:9px;padding:4px 12px;border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;gap:5px;cursor:pointer}
+.connector-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--red)}
+.connector-pill .dot.online{background:var(--green)}
+/* SETTINGS MODAL */
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100}
+.settings-overlay.open{display:flex}
+.settings-modal{background:var(--panel);border:1px solid var(--cyan);border-radius:8px;padding:24px;width:500px;max-height:80vh;overflow-y:auto}
+.settings-modal h2{font-family:'Orbitron',sans-serif;color:var(--cyan);font-size:14px;letter-spacing:3px;margin-bottom:16px}
+.setting-group{margin-bottom:16px}
+.setting-group label{display:block;font-size:11px;color:var(--cyan);margin-bottom:4px;letter-spacing:1px}
+.setting-group input,.setting-group select{width:100%;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:12px}
+.setting-group input:focus{border-color:var(--cyan)}
+.settings-save{background:var(--cyan);color:var(--bg);border:none;padding:10px 24px;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:11px;cursor:pointer;letter-spacing:2px;margin-top:8px}
+.settings-save:hover{opacity:.8}
+.settings-close{float:right;background:none;border:none;color:var(--red);font-size:18px;cursor:pointer}
+/* ORBITAL ANIMATION */
+.orbital-container{position:absolute;top:50%;left:40%;transform:translate(-50%,-50%);pointer-events:none;opacity:.08}
+.orbital{border:1px solid var(--cyan);border-radius:50%;position:absolute;animation:spin linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- LEFT PANEL -->
+<div class="left-panel">
+  <div class="panel-box">
+    <div class="panel-title">SYSTEM</div>
+    <div class="stat-row"><span>CPU</span><span class="stat-val" id="cpu">--</span></div>
+    <div class="stat-row"><span>MEMORY</span><span class="stat-val" id="mem">--</span></div>
+    <div class="stat-row"><span>AI ENGINE</span><span class="stat-val green" id="engine">ANTHROPIC</span></div>
+    <div class="stat-row"><span>VOICE</span><span class="stat-val green" id="voice-status">ELEVENLABS</span></div>
+    <div class="stat-row"><span>UPTIME</span><span class="stat-val" id="uptime">00:00:00</span></div>
+  </div>
+  <div class="panel-box">
+    <div class="panel-title">CONNECTORS</div>
+    <div class="stat-row"><span>Command Center</span><span class="stat-val" id="cc-status">--</span></div>
+    <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
+    <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
+    <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
+  </div>
+  <div class="panel-box">
+    <div class="panel-title">PIPELINE</div>
+    <div class="stat-row"><span>LEADS</span><span class="stat-val" id="pl-leads">--</span></div>
+    <div class="stat-row"><span>NEW</span><span class="stat-val" id="pl-new">--</span></div>
+    <div class="stat-row"><span>SENT</span><span class="stat-val" id="pl-sent">--</span></div>
+    <div class="stat-row"><span>REPLIED</span><span class="stat-val" id="pl-replied">--</span></div>
+    <div class="stat-row"><span>REPLY RATE</span><span class="stat-val" id="pl-rate">--</span></div>
+  </div>
+  <div class="panel-box">
+    <div class="panel-title">MEMORY</div>
+    <div class="stat-row"><span>MESSAGES</span><span class="stat-val" id="mem-msgs">0</span></div>
+    <div class="stat-row"><span>SESSIONS</span><span class="stat-val" id="mem-sessions">0</span></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main-area">
+  <!-- Orbital bg -->
+  <div class="orbital-container">
+    <div class="orbital" style="width:200px;height:200px;top:-100px;left:-100px;animation-duration:20s"></div>
+    <div class="orbital" style="width:350px;height:350px;top:-175px;left:-175px;animation-duration:35s"></div>
+    <div class="orbital" style="width:500px;height:500px;top:-250px;left:-250px;animation-duration:55s"></div>
+  </div>
+
+  <div class="header">
+    <div>
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="clock-date" id="clock-date">---</div>
+    </div>
+    <div class="title">F.R.I.D.A.Y.</div>
+    <div class="header-btns">
+      <button class="header-btn" onclick="refreshData()" title="Refresh data">&#x21bb;</button>
+      <button class="header-btn" onclick="openSettings()" title="Settings">&#x2699;</button>
+    </div>
+  </div>
+
+  <div class="chat-area" id="chat"></div>
+
+  <div class="input-area">
+    <input type="text" id="input" placeholder="Ask or type a command, Sir..." autocomplete="off">
+    <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Voice input">&#x1F3A4;</button>
+    <button class="send-btn" onclick="sendMessage()" title="Send">&#x27A4;</button>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="connector-pill"><span class="dot" id="dot-cc"></span>CMD CENTER</div>
+    <div class="connector-pill"><span class="dot" id="dot-gcal"></span>GCAL</div>
+    <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
+    <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="settings-overlay" id="settings-overlay">
+  <div class="settings-modal">
+    <button class="settings-close" onclick="closeSettings()">&times;</button>
+    <h2>SETTINGS</h2>
+    <div class="setting-group">
+      <label>ANTHROPIC API KEY</label>
+      <input type="password" id="set-api-key" placeholder="sk-ant-...">
+    </div>
+    <div class="setting-group">
+      <label>COMMAND CENTER URL</label>
+      <input type="text" id="set-cc-url" placeholder="https://leadfinder-rho.vercel.app">
+    </div>
+    <div class="setting-group">
+      <label>ELEVENLABS API KEY</label>
+      <input type="password" id="set-eleven-key" placeholder="ElevenLabs API key">
+    </div>
+    <div class="setting-group">
+      <label>VOICE ID</label>
+      <input type="text" id="set-voice-id" placeholder="pFZP5JQG7iQjIQuC4Bku">
+    </div>
+    <div class="setting-group">
+      <label>CLAUDE MODEL</label>
+      <select id="set-model">
+        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+        <option value="claude-opus-4-20250514">Claude Opus 4</option>
+        <option value="claude-haiku-4-20250307">Claude Haiku 4</option>
+      </select>
+    </div>
+    <button class="settings-save" onclick="saveSettings()">SAVE CONFIGURATION</button>
+  </div>
+</div>
+
+<script>
+// ==================== STATE ====================
+const DB_NAME = 'FRIDAY_DB';
+const DB_VERSION = 2;
+let db = null;
+let settings = {
+  apiKey: '',
+  ccUrl: 'https://leadfinder-rho.vercel.app',
+  elevenKey: '',
+  voiceId: 'pFZP5JQG7iQjIQuC4Bku',
+  model: 'claude-sonnet-4-20250514'
+};
+let conversationHistory = [];
+let statsData = {};
+let leadsData = [];
+let startTime = Date.now();
+let sessionCount = 0;
+let messageCount = 0;
+let isRecording = false;
+let mediaRecorder = null;
+
+// ==================== TOOLS ====================
+const TOOLS = [
+  {
+    name: 'deploy_scout',
+    description: 'Deploy the Scout Agent to discover new leads in a region.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        region: { type: 'string', description: 'Target region', default: 'Benelux' },
+        industry: { type: 'string', description: 'Industries, comma separated', default: 'fashion,retail,ecommerce' },
+        limit: { type: 'number', description: 'Max leads', default: 10 }
+      }
+    }
+  },
+  {
+    name: 'send_emails',
+    description: 'Send outreach emails to leads by status or specific IDs.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by status (NEW, DRAFTED, etc.)' },
+        leadIds: { type: 'array', items: { type: 'string' }, description: 'Specific lead emails' },
+        sequenceStep: { type: 'number', description: 'Sequence step 1-6', default: 1 }
+      }
+    }
+  },
+  {
+    name: 'update_lead',
+    description: 'Update a lead status or add notes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string' },
+        status: { type: 'string' },
+        notes: { type: 'string' }
+      },
+      required: ['email']
+    }
+  },
+  {
+    name: 'get_lead_detail',
+    description: 'Look up a lead by email or company.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string' },
+        company: { type: 'string' }
+      }
+    }
+  },
+  {
+    name: 'refresh_data',
+    description: 'Force refresh leads cache.',
+    input_schema: { type: 'object', properties: {} }
+  }
+];
+
+// ==================== SYSTEM PROMPT ====================
+function buildSystemPrompt() {
+  const totalLeads = leadsData.length;
+  const byStatus = {};
+  leadsData.forEach(l => {
+    const s = (l.status || 'NEW').toUpperCase();
+    byStatus[s] = (byStatus[s] || 0) + 1;
+  });
+  const recentLeads = leadsData.slice(0, 10).map(l => ({
+    name: (l.firstName || l.name || '') + ' ' + (l.lastName || ''),
+    company: l.company || '', title: l.title || '',
+    email: l.email || '', status: l.status || ''
+  }));
+
+  return `You are FRIDAY, an AI operations assistant built for Laurence Idelenburg. Think Stark Industries AI but for sales operations. Warm British tone, professional but personable. Address Laurence as "Sir" occasionally.
+
+You are CONNECTED to the Stark Industries Command Center. You have LIVE data AND can execute actions via tools.
+
+CURRENT LIVE DATA:
+- Total Leads: ${totalLeads}
+- Pipeline: ${JSON.stringify(byStatus)}
+- Stats: ${JSON.stringify(statsData)}
+- Recent Leads: ${JSON.stringify(recentLeads)}
+
+CAPABILITIES (use your tools when asked):
+1. deploy_scout â Find new leads in a region
+2. send_emails â Send outreach emails
+3. update_lead â Update lead status/notes
+4. get_lead_detail â Look up a lead
+5. refresh_data â Refresh cache
+
+INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%â27%. Edblad -67% processing. 6-step email sequence.
+
+RULES:
+- Give concrete numbers from live data
+- Use tools when asked to take action â don't just describe
+- Keep responses concise like an ops briefing
+- Flag risks: stale leads, low reply rates, sequence gaps
+- After actions, confirm with specifics`;
+}
+
+// ==================== IndexedDB ====================
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings');
+      if (!d.objectStoreNames.contains('history')) d.createObjectStore('history', { autoIncrement: true });
+      if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { autoIncrement: true });
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = e => reject(e);
+  });
+}
+
+async function dbGet(store, key) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function dbPut(store, key, val) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(val, key);
+    tx.oncomplete = () => resolve();
+  });
+}
+
+async function dbCount(store) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).count();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(0);
+  });
+}
+
+async function loadSettings() {
+  const saved = await dbGet('settings', 'config');
+  if (saved) settings = { ...settings, ...saved };
+  document.getElementById('set-api-key').value = settings.apiKey || '';
+  document.getElementById('set-cc-url').value = settings.ccUrl || '';
+  document.getElementById('set-eleven-key').value = settings.elevenKey || '';
+  document.getElementById('set-voice-id').value = settings.voiceId || '';
+  document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
+}
+
+async function saveSettings() {
+  settings.apiKey = document.getElementById('set-api-key').value.trim();
+  settings.ccUrl = document.getElementById('set-cc-url').value.trim();
+  settings.elevenKey = document.getElementById('set-eleven-key').value.trim();
+  settings.voiceId = document.getElementById('set-voice-id').value.trim();
+  settings.model = document.getElementById('set-model').value;
+  await dbPut('settings', 'config', settings);
+  closeSettings();
+  refreshData();
+  addMsg('friday', 'Settings saved, Sir. Reconnecting systems...');
+  setTimeout(init, 500);
+}
+
+// ==================== COMMAND CENTER ====================
+async function fetchStats() {
+  try {
+    const r = await fetch(settings.ccUrl + '/api/stats');
+    if (r.ok) { statsData = await r.json(); return true; }
+  } catch(e) {}
+  return false;
+}
+
+async function fetchLeads() {
+  try {
+    const r = await fetch(settings.ccUrl + '/api/leads');
+    if (r.ok) {
+      const raw = await r.json();
+      leadsData = Array.isArray(raw) ? raw : (raw.leads || []);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+async function executeAction(name, params) {
+  const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
+  const r = await fetch(settings.ccUrl + '/api/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: actionName, params: params || {} })
+  });
+  return r.json();
+}
+
+async function refreshData() {
+  const [statsOk, leadsOk] = await Promise.all([fetchStats(), fetchLeads()]);
+  updatePanels(statsOk);
+}
+
+function updatePanels(ccOnline) {
+  // Command Center status
+  const ccEl = document.getElementById('cc-status');
+  const dotCc = document.getElementById('dot-cc');
+  if (ccOnline) {
+    ccEl.textContent = 'ONLINE'; ccEl.className = 'stat-val green';
+    dotCc.className = 'dot online';
+  } else {
+    ccEl.textContent = 'OFFLINE'; ccEl.className = 'stat-val red';
+    dotCc.className = 'dot';
+  }
+
+  // Engine status
+  const engineEl = document.getElementById('engine');
+  if (settings.apiKey) {
+    engineEl.textContent = 'ANTHROPIC'; engineEl.className = 'stat-val green';
+  } else {
+    engineEl.textContent = 'NO KEY'; engineEl.className = 'stat-val red';
+  }
+
+  // Voice
+  const voiceEl = document.getElementById('voice-status');
+  if (settings.elevenKey) {
+    voiceEl.textContent = 'ELEVENLABS'; voiceEl.className = 'stat-val green';
+  } else {
+    voiceEl.textContent = 'OFF'; voiceEl.className = 'stat-val red';
+  }
+
+  // Pipeline
+  if (statsData.pipeline) {
+    const p = statsData.pipeline;
+    document.getElementById('pl-leads').textContent = p.totalLeads || 0;
+    document.getElementById('pl-new').textContent = (p.byStatus || {}).NEW || 0;
+    document.getElementById('pl-sent').textContent = (p.byStatus || {}).SENT || 0;
+    document.getElementById('pl-replied').textContent = (p.byStatus || {}).REPLIED || 0;
+  }
+  if (statsData.email) {
+    document.getElementById('pl-rate').textContent = statsData.email.replyRate || '0%';
+  }
+}
+
+// ==================== CLAUDE API (DIRECT) ====================
+async function callClaude(userMessage) {
+  if (!settings.apiKey) {
+    return { text: "I need an API key to connect to my AI core, Sir. Open Settings and enter your Anthropic API key.", tools: [] };
+  }
+
+  conversationHistory.push({ role: 'user', content: userMessage });
+
+  let messages = conversationHistory.slice(-20); // keep last 20 for context
+  let response;
+
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': settings.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: settings.model,
+        max_tokens: 1500,
+        system: buildSystemPrompt(),
+        tools: TOOLS,
+        messages: messages
+      })
+    });
+  } catch(e) {
+    return { text: "Connection error, Sir: " + e.message, tools: [] };
+  }
+
+  if (!response.ok) {
+    const err = await response.text();
+    return { text: "API error (" + response.status + "): " + err.substring(0, 200), tools: [] };
+  }
+
+  let data = await response.json();
+  let toolsUsed = [];
+
+  // Tool use loop
+  let iterations = 0;
+  while (data.stop_reason === 'tool_use' && iterations < 5) {
+    iterations++;
+    conversationHistory.push({ role: 'assistant', content: data.content });
+
+    const toolResults = [];
+    for (const block of data.content) {
+      if (block.type !== 'tool_use') continue;
+      toolsUsed.push(block.name);
+
+      let result;
+      try {
+        result = await executeAction(block.name, block.input);
+      } catch(e) {
+        result = { success: false, error: e.message };
+      }
+
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: block.id,
+        content: JSON.stringify(result)
+      });
+    }
+
+    conversationHistory.push({ role: 'user', content: toolResults });
+    messages = conversationHistory.slice(-20);
+
+    try {
+      const resp2 = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          max_tokens: 1500,
+          system: buildSystemPrompt(),
+          tools: TOOLS,
+          messages: messages
+        })
+      });
+      data = await resp2.json();
+    } catch(e) {
+      return { text: "Lost connection during tool execution: " + e.message, tools: toolsUsed };
+    }
+  }
+
+  // Extract text
+  let text = '';
+  for (const block of (data.content || [])) {
+    if (block.type === 'text') text += block.text;
+  }
+  if (!text) text = 'Action completed, Sir.';
+
+  conversationHistory.push({ role: 'assistant', content: data.content || [{ type: 'text', text }] });
+
+  // Refresh panels after tool use
+  if (toolsUsed.length > 0) refreshData();
+
+  return { text, tools: toolsUsed };
+}
+
+// ==================== VOICE (ElevenLabs) ====================
+async function speak(text) {
+  if (!settings.elevenKey || !settings.voiceId) return;
+  try {
+    const cleanText = text.replace(/[*_`#]/g, '').substring(0, 1000);
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
+      body: JSON.stringify({
+        text: cleanText,
+        model_id: 'eleven_turbo_v2_5',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+      })
+    });
+    if (r.ok) {
+      const blob = await r.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.play();
+    }
+  } catch(e) { console.error('TTS error:', e); }
+}
+
+// ==================== VOICE INPUT ====================
+function toggleMic() {
+  if (isRecording) { stopRecording(); }
+  else { startRecording(); }
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    const chunks = [];
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      // For now, show a message â STT would need Whisper API
+      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon â please type for now.');
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById('mic-btn').classList.add('recording');
+  } catch(e) {
+    addMsg('friday', 'Microphone access denied, Sir.');
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    document.getElementById('mic-btn').classList.remove('recording');
+  }
+}
+
+// ==================== UI ====================
+function addMsg(type, text, tools) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
+
+  let label = type === 'friday' ? 'F.R.I.D.A.Y.' : 'YOU';
+  let html = `<div class="msg-label">${label} â ${timeStr}</div>`;
+  html += text.replace(/\n/g, '<br>');
+
+  if (tools && tools.length > 0) {
+    html += '<div style="margin-top:8px">';
+    tools.forEach(t => { html += `<span class="tool-badge">â¡ ${t}</span>`; });
+    html += '</div>';
+  }
+
+  div.innerHTML = html;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  messageCount++;
+  document.getElementById('mem-msgs').textContent = messageCount;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  addMsg('user', msg);
+
+  // Show typing indicator
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'msg friday';
+  typingDiv.innerHTML = '<div class="msg-label">F.R.I.D.A.Y.</div><span style="opacity:.5">Processing...</span>';
+  typingDiv.id = 'typing';
+  document.getElementById('chat').appendChild(typingDiv);
+
+  const result = await callClaude(msg);
+
+  // Remove typing
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+
+  addMsg('friday', result.text, result.tools);
+  speak(result.text);
+
+  // Save to DB
+  if (db) {
+    const tx = db.transaction('history', 'readwrite');
+    tx.objectStore('history').add({ user: msg, friday: result.text, tools: result.tools, time: Date.now() });
+  }
+}
+
+function openSettings() { document.getElementById('settings-overlay').classList.add('open'); }
+function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
+
+// ==================== CLOCK & UPTIME ====================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+  document.getElementById('clock-date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('uptime').textContent = `${h}:${m}:${s}`;
+
+  // Fake system stats
+  document.getElementById('cpu').textContent = Math.floor(8 + Math.random() * 15) + '%';
+  document.getElementById('mem').textContent = (3.5 + Math.random() * 1.5).toFixed(1) + ' GB';
+}
+
+// ==================== INIT ====================
+async function init() {
+  await openDB();
+  await loadSettings();
+
+  // Count sessions
+  sessionCount = await dbCount('sessions');
+  sessionCount++;
+  const tx = db.transaction('sessions', 'readwrite');
+  tx.objectStore('sessions').add({ time: Date.now() });
+  document.getElementById('mem-sessions').textContent = sessionCount;
+
+  // Message count from history
+  messageCount = await dbCount('history');
+  document.getElementById('mem-msgs').textContent = messageCount;
+
+  // Clock
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Fetch data
+  await refreshData();
+
+  // Greeting
+  const hour = new Date().getHours();
+  let greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  if (!settings.apiKey) {
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (â) and enter your Anthropic API key to activate full operations.`);
+  } else {
+    const leadCount = leadsData.length;
+    const newCount = leadsData.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
+    addMsg('friday', `${greeting}, Sir. All systems operational. I'm connected directly to Claude and the Command Center. ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
+    speak(`${greeting}, Sir. All systems operational. ${leadCount} leads in pipeline. What are we working on?`);
+  }
+}
+
+// Key handler
+document.getElementById('input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+// Start
+init();
+</script>
+</body>
+</html>
