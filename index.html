@@ -875,6 +875,11 @@ function initAutoSave() {
     readSettingsFromDOM();
     try { localStorage.setItem('FRIDAY_SETTINGS', JSON.stringify(settings)); } catch(e) {}
   });
+  // Persist immediately on select/checkbox change
+  ['set-provider','set-groq-model','set-gemini-model','set-notif-enabled'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { readSettingsFromDOM(); persistSettings(); });
+  });
 }
 
 // ==================== COMMAND CENTER ====================
@@ -1916,19 +1921,16 @@ async function callAnthropic(userMessage) {
 }
 
 // ==================== VOICE (ElevenLabs) ====================
-// AudioContext stays unlocked after first user gesture — no autoplay issues
 let _audioCtx = null;
 function _getAudioCtx() {
   if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return _audioCtx;
 }
-function _unlockAudio() {
-  const ctx = _getAudioCtx();
-  if (ctx.state === 'suspended') ctx.resume();
+async function _unlockAudio() {
+  try { const ctx = _getAudioCtx(); if (ctx.state === 'suspended') await ctx.resume(); } catch(e) {}
 }
 document.addEventListener('click', _unlockAudio);
 document.addEventListener('keydown', _unlockAudio);
-document.addEventListener('touchstart', _unlockAudio);
 
 async function speak(text) {
   if (!settings.elevenKey || !settings.voiceId) return;
@@ -1938,24 +1940,18 @@ async function speak(text) {
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
-      body: JSON.stringify({
-        text: cleanText,
-        model_id: 'eleven_turbo_v2_5',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
-      })
+      body: JSON.stringify({ text: cleanText, model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
     });
     if (!r.ok) { console.error('ElevenLabs', r.status, await r.text().then(t=>t.substring(0,200))); return; }
-    const arrayBuffer = await r.arrayBuffer();
+    const buf = await r.arrayBuffer();
     const ctx = _getAudioCtx();
-    if (ctx.state === 'suspended') await ctx.resume();
-    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    const source = ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(ctx.destination);
-    orbState = 'speaking';
-    source.onended = () => { orbState = 'idle'; };
-    source.start(0);
-  } catch(e) { console.error('TTS error:', e); }
+    await _unlockAudio();
+    const decoded = await ctx.decodeAudioData(buf);
+    const src = ctx.createBufferSource();
+    src.buffer = decoded; src.connect(ctx.destination);
+    orbState = 'speaking'; src.onended = () => { orbState = 'idle'; };
+    src.start(0);
+  } catch(e) { console.error('TTS:', e); }
 }
 
 // ==================== VOICE INPUT ====================
@@ -2018,6 +2014,7 @@ function addMsg(type, text, tools) {
 }
 
 async function sendMessage() {
+  _unlockAudio();
   const input = document.getElementById('input');
   const msg = input.value.trim();
   if (!msg) return;
