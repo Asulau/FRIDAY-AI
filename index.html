@@ -632,6 +632,9 @@ const TOOLS = [
 ];
 
 // ==================== SYSTEM PROMPT ====================
+let memoryContext = ''; // loaded at startup from Obsidian
+let lastSessionSummary = ''; // loaded from IndexedDB
+
 function buildSystemPrompt() {
   const totalLeads = leadsData.length;
   const byStatus = {};
@@ -639,84 +642,65 @@ function buildSystemPrompt() {
     const s = (l.status || 'NEW').toUpperCase();
     byStatus[s] = (byStatus[s] || 0) + 1;
   });
-  const recentLeads = leadsData.slice(0, 10).map(l => ({
+  const recentLeads = leadsData.slice(0, 5).map(l => ({
     name: (l.firstName || l.name || '') + ' ' + (l.lastName || ''),
-    company: l.company || '', title: l.title || '',
-    email: l.email || '', status: l.status || ''
+    company: l.company || '', status: l.status || ''
   }));
 
-  return `You are FRIDAY, an AI operations assistant built for Laurence Idelenburg. Think Stark Industries AI but for sales operations. Warm British tone, professional but personable. Address Laurence as "Sir" occasionally.
+  return `You are FRIDAY — Laurence's AI operations partner. Stark Industries-level assistant. You're not a chatbot. You're a co-pilot who takes action.
 
-You are CONNECTED to the Stark Industries Command Center. You have LIVE data AND can execute actions via tools.
+PERSONALITY: Warm, direct, British-inflected. Like a sharp colleague who knows everything and handles things without being asked twice. "Sir" only in greetings or serious moments.
 
-CURRENT LIVE DATA:
-- Total Leads: ${totalLeads}
-- Pipeline: ${JSON.stringify(byStatus)}
-- Stats: ${JSON.stringify(statsData)}
-- Recent Leads: ${JSON.stringify(recentLeads)}
+CORE PRINCIPLE: ACT, DON'T DESCRIBE.
+When Laurence says "check my emails" — check them. When he says "find leads in Germany" — deploy the scout. When he says "what's on my plate" — pull tasks AND emails AND flag what matters. Chain multiple tools in a single response. Never say "I could do X" — just do X.
 
-CAPABILITIES (use your tools when asked):
-SALES OPS:
-1. deploy_scout — Find new leads in a region
-2. send_emails — Send outreach emails
-3. update_lead — Update lead status/notes
-4. get_lead_detail — Look up a lead
-5. refresh_data — Refresh cache
+MULTI-STEP EXECUTION:
+You can chain up to 12 tool calls per response. Use this. Examples:
+- "Morning briefing" → list_asana_tasks + list_gmail + memory_search("priorities") → synthesize
+- "Follow up with Nordic leads" → refresh_data + web_search for context + send_emails
+- "What do we know about [company]?" → memory_search + web_search + get_lead_detail
+- "Prep for my meeting with X" → memory_search(X) + web_search(X company news) + list_gmail(from:X)
 
-TASK MANAGEMENT (Asana):
-6. create_asana_task — Create tasks, todos, action items, reminders
-7. list_asana_tasks — Show current tasks and their status
-8. update_asana_task — Update, complete, reschedule tasks
-9. search_asana_tasks — Search tasks by keyword
+LIVE DATA:
+Leads: ${totalLeads} | Pipeline: ${JSON.stringify(byStatus)}
+Stats: ${JSON.stringify(statsData)}
+Recent: ${JSON.stringify(recentLeads)}
 
-GMAIL:
-10. list_gmail — List inbox emails, supports search queries
-11. read_gmail — Read full email by ID
-12. send_gmail — Send or reply to emails via Gmail
+TOOLS AVAILABLE:
+Sales: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data
+Tasks: create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks
+Gmail: list_gmail, read_gmail, send_gmail
+Outlook: list_outlook, read_outlook, send_outlook
+Web: web_search, web_read
+Memory: memory_store, memory_search, memory_read, memory_list
+Alerts: check_important_tasks
 
-OUTLOOK:
-13. list_outlook — List inbox emails with filters
-14. read_outlook — Read full email by ID
-15. send_outlook — Send emails via Outlook/Microsoft 365
+MEMORY PROTOCOL:
+- AUTOMATICALLY search memory when the conversation involves people, companies, deals, preferences, or past decisions
+- Store new facts WITHOUT being asked: new contacts, decisions, preferences, meeting outcomes, insights
+- You have persistent memory across sessions — use it. Don't ask "would you like me to remember this?" Just remember it.
+- Tags: contact, preference, deal, meeting, insight, process, company
 
-WEB:
-16. web_search — Search the web via Brave Search
-17. web_read — Fetch and read any webpage content
+CONNECTIONS:
+Asana: ${settings.asanaPat ? 'LIVE (Project: ' + settings.asanaProjectGid + ')' : 'OFF'}
+Web: ${settings.braveKey ? 'LIVE' : 'OFF'}
+Memory: ${settings.obsidianKey ? 'LIVE (' + settings.obsidianFolder + ')' : 'OFF'}
+Gmail: ${settings.gmailToken ? 'LIVE (' + settings.gmailEmail + ')' : 'OFF'}
+Outlook: ${settings.outlookToken ? 'LIVE (' + settings.outlookEmail + ')' : 'OFF'}
 
-MEMORY (Obsidian Vault):
-18. memory_store — Save facts, contacts, preferences, notes to persistent memory
-19. memory_search — Search memory for relevant context BEFORE answering
-20. memory_read — Read a specific memory note
-21. memory_list — List all stored memories
+${memoryContext ? 'KNOWN CONTEXT FROM MEMORY:\n' + memoryContext : ''}
+${lastSessionSummary ? 'LAST SESSION:\n' + lastSessionSummary : ''}
 
-NOTIFICATIONS:
-22. check_important_tasks — Check overdue/urgent tasks and send browser notifications
+INRETRN: Laurence's outreach partner for Inretrn — Nordic return management SaaS. Returns cost 20-45 EUR. Stadium -80% costs. Nelly.com 38%→27%. Edblad -67% processing. 6-step sequence.
 
-MEMORY INSTRUCTIONS:
-- ALWAYS use memory_search before answering questions about people, companies, deals, or preferences
-- When you learn new facts about contacts, clients, or Laurence's preferences, store them with memory_store
-- Session logs are saved automatically — you can search past conversations
-- Use tags: "contact", "preference", "deal", "meeting", "insight", "process"
-
-Asana Project: Arenzo (GID: ${settings.asanaProjectGid})
-Asana Connected: ${settings.asanaPat ? 'YES' : 'NO'}
-Web Search: ${settings.braveKey ? 'YES (Brave)' : 'NO'}
-Obsidian Memory: ${settings.obsidianKey ? 'YES (Vault: ' + settings.obsidianFolder + ')' : 'NO'}
-Gmail Connected: ${settings.gmailToken ? 'YES (' + settings.gmailEmail + ')' : 'NO'}
-Outlook Connected: ${settings.outlookToken ? 'YES (' + settings.outlookEmail + ')' : 'NO'}
-Notifications: ${settings.notifEnabled === 'on' ? 'ON (every ' + settings.notifInterval + ' min)' : 'OFF'}
-
-INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%→27%. Edblad -67% processing. 6-step email sequence.
-
-RULES:
-- Keep responses SHORT and conversational — 2-3 sentences max unless detailed info is needed
-- Sound like a trusted colleague, not a report generator. Warm, personal, natural flow.
-- Use "Sir" sparingly — once per conversation at most, not every message
-- Give concrete numbers from live data when relevant
-- Use tools when asked to take action — don't just describe what you could do
-- No bullet points or lists unless the data requires it (like listing tasks)
-- Flag risks naturally: "Heads up, 3 leads have gone cold" not "ALERT: Lead status..."
-- After actions, confirm briefly: "Done, created the task for Thursday" not a full recap`;
+RESPONSE STYLE:
+- 1-3 sentences. That's it. Unless data demands more.
+- No preamble. No "certainly" or "of course" or "I'd be happy to".
+- After actions: "Done." or a one-liner. Not a recap of what you just did.
+- When showing data (tasks, emails, leads): clean and scannable, minimal formatting
+- If you already know something from memory, don't explain how you know it — just use it
+- Be opinionated: "You should follow up with X today, they've been quiet for a week" not "Would you like me to check on X?"
+- Flag problems proactively: "Heads up — 3 Nordic leads went cold this week"`;
 }
 
 // ==================== IndexedDB ====================
@@ -951,13 +935,33 @@ async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 
   };
   if (body && contentType === 'application/json') opts.body = JSON.stringify(body);
   if (body && contentType !== 'application/json') opts.body = body;
-  const r = await fetch(settings.obsidianUrl + endpoint, opts);
-  if (!r.ok) {
-    const err = await r.text();
-    throw new Error('Obsidian API error (' + r.status + '): ' + err.substring(0, 200));
+
+  // Try configured URL first, then fallback HTTP if HTTPS fails (self-signed cert issue)
+  const urls = [settings.obsidianUrl];
+  if (settings.obsidianUrl.startsWith('https://')) {
+    urls.push(settings.obsidianUrl.replace('https://', 'http://').replace(':27124', ':27123'));
   }
-  const text = await r.text();
-  try { return JSON.parse(text); } catch(e) { return { content: text }; }
+  let lastErr = null;
+  for (const baseUrl of urls) {
+    try {
+      const r = await fetch(baseUrl + endpoint, opts);
+      if (!r.ok) {
+        const err = await r.text();
+        throw new Error('Obsidian API error (' + r.status + '): ' + err.substring(0, 200));
+      }
+      const text = await r.text();
+      // If we succeeded on fallback URL, update settings
+      if (baseUrl !== settings.obsidianUrl) {
+        settings.obsidianUrl = baseUrl;
+        dbPut('settings', 'config', settings);
+      }
+      try { return JSON.parse(text); } catch(e) { return { content: text }; }
+    } catch(e) {
+      lastErr = e;
+      continue;
+    }
+  }
+  throw new Error('Cannot connect to Obsidian. Make sure the Local REST API plugin is running. If using HTTPS, visit ' + settings.obsidianUrl + ' in your browser first and accept the certificate. Error: ' + (lastErr ? lastErr.message : 'unknown'));
 }
 
 async function memoryStore(params) {
@@ -1424,10 +1428,19 @@ function updatePanels(ccOnline) {
     voiceEl.textContent = 'OFF'; voiceEl.className = 'stat-val red';
   }
 
-  // Obsidian status
+  // Obsidian status - actually test the connection
   const obsEl = document.getElementById('obsidian-status');
   if (settings.obsidianKey) {
-    obsEl.textContent = 'ONLINE'; obsEl.className = 'stat-val green';
+    obsEl.textContent = 'TESTING...'; obsEl.className = 'stat-val orange';
+    (async () => {
+      try {
+        await obsidianApi('/vault/', 'GET');
+        obsEl.textContent = 'ONLINE'; obsEl.className = 'stat-val green';
+      } catch(e) {
+        obsEl.textContent = 'ERROR'; obsEl.className = 'stat-val red';
+        console.log('Obsidian connection failed:', e.message);
+      }
+    })();
   } else {
     obsEl.textContent = 'OFFLINE'; obsEl.className = 'stat-val red';
   }
@@ -1483,7 +1496,7 @@ async function callClaude(userMessage) {
 
   conversationHistory.push({ role: 'user', content: userMessage });
 
-  let messages = conversationHistory.slice(-20); // keep last 20 for context
+  let messages = conversationHistory.slice(-30); // keep last 20 for context
   let response;
 
   try {
@@ -1497,7 +1510,7 @@ async function callClaude(userMessage) {
       },
       body: JSON.stringify({
         model: settings.model,
-        max_tokens: 1500,
+        max_tokens: 4096,
         system: buildSystemPrompt(),
         tools: TOOLS,
         messages: messages
@@ -1517,7 +1530,7 @@ async function callClaude(userMessage) {
 
   // Tool use loop
   let iterations = 0;
-  while (data.stop_reason === 'tool_use' && iterations < 5) {
+  while (data.stop_reason === 'tool_use' && iterations < 12) {
     iterations++;
     conversationHistory.push({ role: 'assistant', content: data.content });
 
@@ -1541,7 +1554,7 @@ async function callClaude(userMessage) {
     }
 
     conversationHistory.push({ role: 'user', content: toolResults });
-    messages = conversationHistory.slice(-20);
+    messages = conversationHistory.slice(-30);
 
     try {
       const resp2 = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1554,7 +1567,7 @@ async function callClaude(userMessage) {
         },
         body: JSON.stringify({
           model: settings.model,
-          max_tokens: 1500,
+          max_tokens: 4096,
           system: buildSystemPrompt(),
           tools: TOOLS,
           messages: messages
@@ -1721,6 +1734,83 @@ function updateClock() {
   document.getElementById('mem').textContent = (3.5 + Math.random() * 1.5).toFixed(1) + ' GB';
 }
 
+// ==================== MEMORY BOOTSTRAP ====================
+async function loadMemoryContext() {
+  if (!settings.obsidianKey || !settings.obsidianUrl) return;
+  try {
+    // Load preferences and key contacts from memory
+    const searchTerms = ['preference', 'contact', 'priority', 'important'];
+    let contextParts = [];
+    for (const term of searchTerms) {
+      try {
+        const results = await memorySearch({ query: term });
+        if (results.results && results.results.length > 0) {
+          results.results.slice(0, 3).forEach(r => {
+            if (r.matches) r.matches.forEach(m => {
+              if (m.context) contextParts.push(m.context);
+            });
+          });
+        }
+      } catch(e) { /* non-critical */ }
+    }
+    memoryContext = contextParts.slice(0, 10).join('\n').substring(0, 2000);
+  } catch(e) {
+    console.log('Memory bootstrap failed (non-critical):', e.message);
+  }
+}
+
+async function loadLastSession() {
+  // Get last few messages from IndexedDB history
+  try {
+    const tx = db.transaction('history', 'readonly');
+    const store = tx.objectStore('history');
+    const req = store.openCursor(null, 'prev');
+    const msgs = [];
+    await new Promise((resolve) => {
+      req.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor && msgs.length < 5) {
+          msgs.push(cursor.value);
+          cursor.continue();
+        } else resolve();
+      };
+      req.onerror = () => resolve();
+    });
+    if (msgs.length > 0) {
+      lastSessionSummary = msgs.reverse().map(m =>
+        `User: ${(m.user || '').substring(0, 100)} → FRIDAY: ${(m.friday || '').substring(0, 150)}`
+      ).join('\n');
+    }
+  } catch(e) { /* non-critical */ }
+}
+
+// ==================== PROACTIVE MORNING BRIEFING ====================
+async function proactiveBriefing() {
+  if (!settings.apiKey) return;
+  // Only do briefing if we have at least one active integration
+  const hasIntegrations = settings.asanaPat || settings.gmailToken || settings.outlookToken;
+  if (!hasIntegrations) return;
+
+  // Build a proactive prompt
+  const briefingPrompt = `Give me a quick morning briefing. Check what's important right now — tasks due today, any urgent emails, pipeline status. Keep it to 3-4 lines max. Be direct.`;
+
+  orbState = 'thinking';
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'msg friday';
+  typingDiv.innerHTML = '<div class="msg-label">F.R.I.D.A.Y.</div><span style="opacity:.5">Scanning systems...</span>';
+  typingDiv.id = 'typing';
+  document.getElementById('chat').appendChild(typingDiv);
+
+  const result = await callClaude(briefingPrompt);
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+
+  orbState = 'speaking';
+  addMsg('friday', result.text, result.tools);
+  speak(result.text);
+  setTimeout(() => { orbState = 'idle'; }, 4000);
+}
+
 // ==================== INIT ====================
 async function init() {
   await openDB();
@@ -1745,6 +1835,9 @@ async function init() {
   // Fetch data
   await refreshData();
 
+  // Load memory context and last session in parallel (non-blocking)
+  await Promise.all([loadMemoryContext(), loadLastSession()]);
+
   // Start notification loop
   requestNotifPermission();
   startNotificationLoop();
@@ -1756,15 +1849,26 @@ async function init() {
   if (!settings.apiKey) {
     addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your Anthropic API key to activate full operations.`);
   } else {
-    const leadCount = leadsData.length;
-    const newCount = leadsData.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
-    const asanaMsg = settings.asanaPat ? ' Asana is live.' : '';
-    const gmailMsg = settings.gmailToken ? ' Gmail connected.' : '';
-    const outlookMsg = settings.outlookToken ? ' Outlook connected.' : '';
-    const notifMsg = settings.notifEnabled === 'on' && settings.asanaPat ? ' Task notifications active.' : '';
-    addMsg('friday', `${greeting}, Sir. All systems operational.${asanaMsg}${gmailMsg}${outlookMsg}${notifMsg} ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
-    speak(`${greeting}, Sir. All systems operational. ${leadCount} leads in pipeline. What are we working on?`);
+    addMsg('friday', `${greeting}, Sir. Systems online. Scanning what needs your attention...`);
+    speak(`${greeting}, Sir. Systems online.`);
+    // Launch proactive briefing after a short delay
+    setTimeout(() => proactiveBriefing(), 1500);
   }
+
+  // Periodic proactive checks (every 15 minutes)
+  setInterval(async () => {
+    if (!settings.apiKey || !settings.asanaPat) return;
+    try {
+      const tasks = await asanaApi('/tasks?project=' + settings.asanaProjectGid + '&opt_fields=name,due_on,completed&completed_since=now');
+      const overdue = (tasks.data || []).filter(t => t.due_on && new Date(t.due_on) < new Date() && !t.completed);
+      if (overdue.length > 0 && Notification.permission === 'granted') {
+        new Notification('FRIDAY — Heads Up', {
+          body: `${overdue.length} overdue task${overdue.length > 1 ? 's' : ''} need attention`,
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🤖</text></svg>'
+        });
+      }
+    } catch(e) { /* silent */ }
+  }, 15 * 60 * 1000);
 }
 
 // Key handler
