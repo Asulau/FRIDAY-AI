@@ -151,8 +151,35 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <button class="settings-close" onclick="closeSettings()">&times;</button>
     <h2>SETTINGS</h2>
     <div class="setting-group">
+      <label>AI PROVIDER</label>
+      <select id="set-provider" onchange="toggleProviderFields()">
+        <option value="gemini">Google Gemini (FREE)</option>
+        <option value="anthropic">Anthropic Claude (Paid)</option>
+      </select>
+    </div>
+    <div class="setting-group" id="group-gemini-key">
+      <label>GEMINI API KEY <span style="color:var(--green);font-size:9px">(FREE — get at aistudio.google.com)</span></label>
+      <input type="password" id="set-gemini-key" placeholder="AIza...">
+    </div>
+    <div class="setting-group" id="group-gemini-model">
+      <label>GEMINI MODEL</label>
+      <select id="set-gemini-model">
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
+        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (Faster)</option>
+        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+      </select>
+    </div>
+    <div class="setting-group" id="group-api-key" style="display:none">
       <label>ANTHROPIC API KEY</label>
       <input type="password" id="set-api-key" placeholder="sk-ant-...">
+    </div>
+    <div class="setting-group" id="group-model" style="display:none">
+      <label>CLAUDE MODEL</label>
+      <select id="set-model">
+        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+        <option value="claude-opus-4-20250514">Claude Opus 4</option>
+        <option value="claude-haiku-4-20250307">Claude Haiku 4</option>
+      </select>
     </div>
     <div class="setting-group">
       <label>COMMAND CENTER URL</label>
@@ -173,14 +200,6 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="setting-group">
       <label>ASANA PROJECT GID</label>
       <input type="text" id="set-asana-project" placeholder="1213654696710519">
-    </div>
-    <div class="setting-group">
-      <label>CLAUDE MODEL</label>
-      <select id="set-model">
-        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-        <option value="claude-opus-4-20250514">Claude Opus 4</option>
-        <option value="claude-haiku-4-20250307">Claude Haiku 4</option>
-      </select>
     </div>
     <hr style="border-color:var(--border);margin:16px 0">
     <h2 style="font-size:12px;margin-bottom:12px">WEB SEARCH</h2>
@@ -244,7 +263,10 @@ const DB_NAME = 'FRIDAY_DB';
 const DB_VERSION = 2;
 let db = null;
 let settings = {
+  provider: 'gemini',
   apiKey: '',
+  geminiKey: '',
+  geminiModel: 'gemini-2.0-flash',
   ccUrl: 'https://leadfinder-rho.vercel.app',
   elevenKey: '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
@@ -767,6 +789,9 @@ async function loadSettings() {
     // Sync to both storage backends
     persistSettings();
   }
+  document.getElementById('set-provider').value = settings.provider || 'gemini';
+  document.getElementById('set-gemini-key').value = settings.geminiKey || '';
+  document.getElementById('set-gemini-model').value = settings.geminiModel || 'gemini-2.0-flash';
   document.getElementById('set-api-key').value = settings.apiKey || '';
   document.getElementById('set-cc-url').value = settings.ccUrl || '';
   document.getElementById('set-eleven-key').value = settings.elevenKey || '';
@@ -800,6 +825,9 @@ async function saveSettings() {
 let autoSaveTimer = null;
 
 function readSettingsFromDOM() {
+  settings.provider = document.getElementById('set-provider').value;
+  settings.geminiKey = (document.getElementById('set-gemini-key').value || '').trim();
+  settings.geminiModel = document.getElementById('set-gemini-model').value;
   settings.apiKey = (document.getElementById('set-api-key').value || '').trim();
   settings.ccUrl = (document.getElementById('set-cc-url').value || '').trim();
   settings.elevenKey = (document.getElementById('set-eleven-key').value || '').trim();
@@ -843,7 +871,7 @@ function autoSaveSettings() {
 }
 
 function initAutoSave() {
-  const ids = ['set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
+  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -1434,8 +1462,10 @@ function updatePanels(ccOnline) {
 
   // Engine status
   const engineEl = document.getElementById('engine');
-  if (settings.apiKey) {
-    engineEl.textContent = 'ANTHROPIC'; engineEl.className = 'stat-val green';
+  const activeKey = getActiveKey();
+  if (activeKey) {
+    engineEl.textContent = settings.provider === 'gemini' ? 'GEMINI' : 'ANTHROPIC';
+    engineEl.className = 'stat-val green';
   } else {
     engineEl.textContent = 'NO KEY'; engineEl.className = 'stat-val red';
   }
@@ -1508,15 +1538,160 @@ function updatePanels(ccOnline) {
   }
 }
 
-// ==================== CLAUDE API (DIRECT) ====================
+// ==================== PROVIDER TOGGLE ====================
+function toggleProviderFields() {
+  const isGemini = document.getElementById('set-provider').value === 'gemini';
+  document.getElementById('group-gemini-key').style.display = isGemini ? '' : 'none';
+  document.getElementById('group-gemini-model').style.display = isGemini ? '' : 'none';
+  document.getElementById('group-api-key').style.display = isGemini ? 'none' : '';
+  document.getElementById('group-model').style.display = isGemini ? 'none' : '';
+}
+
+// ==================== GEMINI TOOL FORMAT CONVERTER ====================
+function toolsToGemini() {
+  return [{
+    functionDeclarations: TOOLS.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: {
+        type: 'object',
+        properties: t.input_schema.properties || {},
+        required: t.input_schema.required || []
+      }
+    }))
+  }];
+}
+
+// ==================== GEMINI CONVERSATION FORMAT ====================
+// Gemini uses 'user'/'model' roles and different content structure
+let geminiHistory = [];
+
+function resetGeminiHistory() {
+  geminiHistory = [];
+}
+
+// ==================== AI API (MULTI-PROVIDER) ====================
+function getActiveKey() {
+  return settings.provider === 'gemini' ? settings.geminiKey : settings.apiKey;
+}
+
 async function callClaude(userMessage) {
-  if (!settings.apiKey) {
-    return { text: "I need an API key to connect to my AI core, Sir. Open Settings and enter your Anthropic API key.", tools: [] };
+  const activeKey = getActiveKey();
+  if (!activeKey) {
+    const provider = settings.provider === 'gemini' ? 'Gemini' : 'Anthropic';
+    return { text: `I need an API key to connect, Sir. Open Settings and enter your ${provider} API key. ${settings.provider === 'gemini' ? 'It\'s free at aistudio.google.com/apikey' : ''}`, tools: [] };
   }
 
+  if (settings.provider === 'gemini') {
+    return callGemini(userMessage);
+  } else {
+    return callAnthropic(userMessage);
+  }
+}
+
+// ==================== GEMINI API ====================
+async function callGemini(userMessage) {
+  // Add user message to Gemini history
+  geminiHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+  // Also track in main history for IndexedDB
   conversationHistory.push({ role: 'user', content: userMessage });
 
-  let messages = conversationHistory.slice(-30); // keep last 20 for context
+  const geminiModel = settings.geminiModel || 'gemini-2.0-flash';
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${settings.geminiKey}`;
+  const systemPrompt = buildSystemPrompt();
+  let toolsUsed = [];
+  let iterations = 0;
+
+  async function makeRequest() {
+    const body = {
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: geminiHistory.slice(-30),
+      tools: toolsToGemini(),
+      tool_config: { function_calling_config: { mode: 'AUTO' } },
+      generationConfig: { maxOutputTokens: 4096, temperature: 0.7 }
+    };
+
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error('Gemini API error (' + r.status + '): ' + err.substring(0, 300));
+    }
+    return r.json();
+  }
+
+  try {
+    let data = await makeRequest();
+
+    while (iterations < 12) {
+      const candidate = data.candidates && data.candidates[0];
+      if (!candidate || !candidate.content) break;
+
+      const parts = candidate.content.parts || [];
+      const functionCalls = parts.filter(p => p.functionCall);
+      const textParts = parts.filter(p => p.text);
+
+      // If no function calls, we're done
+      if (functionCalls.length === 0) {
+        const text = textParts.map(p => p.text).join('') || 'Done.';
+        geminiHistory.push({ role: 'model', parts: parts });
+        conversationHistory.push({ role: 'assistant', content: [{ type: 'text', text }] });
+        if (toolsUsed.length > 0) refreshData();
+        return { text, tools: toolsUsed };
+      }
+
+      // Process function calls
+      iterations++;
+      geminiHistory.push({ role: 'model', parts: parts });
+
+      const functionResponses = [];
+      for (const fc of functionCalls) {
+        const name = fc.functionCall.name;
+        const args = fc.functionCall.args || {};
+        toolsUsed.push(name);
+
+        let result;
+        try {
+          result = await executeAction(name, args);
+        } catch(e) {
+          result = { success: false, error: e.message };
+        }
+
+        functionResponses.push({
+          functionResponse: {
+            name: name,
+            response: result
+          }
+        });
+      }
+
+      geminiHistory.push({ role: 'user', parts: functionResponses });
+      data = await makeRequest();
+    }
+
+    // Fallback if loop exhausted
+    const candidate = data.candidates && data.candidates[0];
+    const text = candidate && candidate.content && candidate.content.parts
+      ? candidate.content.parts.filter(p => p.text).map(p => p.text).join('')
+      : 'Done.';
+    conversationHistory.push({ role: 'assistant', content: [{ type: 'text', text }] });
+    if (toolsUsed.length > 0) refreshData();
+    return { text, tools: toolsUsed };
+
+  } catch(e) {
+    return { text: "Connection error: " + e.message, tools: toolsUsed };
+  }
+}
+
+// ==================== ANTHROPIC API ====================
+async function callAnthropic(userMessage) {
+  conversationHistory.push({ role: 'user', content: userMessage });
+
+  let messages = conversationHistory.slice(-30);
   let response;
 
   try {
@@ -1811,7 +1986,7 @@ async function loadLastSession() {
 
 // ==================== PROACTIVE MORNING BRIEFING ====================
 async function proactiveBriefing() {
-  if (!settings.apiKey) return;
+  if (!getActiveKey()) return;
   // Only do briefing if we have at least one active integration
   const hasIntegrations = settings.asanaPat || settings.gmailToken || settings.outlookToken;
   if (!hasIntegrations) return;
@@ -1871,8 +2046,11 @@ async function init() {
   const hour = new Date().getHours();
   let greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  if (!settings.apiKey) {
-    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your Anthropic API key to activate full operations.`);
+  // Show/hide provider fields
+  toggleProviderFields();
+
+  if (!getActiveKey()) {
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your API key — Gemini is free at aistudio.google.com/apikey`);
   } else {
     addMsg('friday', `${greeting}, Sir. Systems online. Scanning what needs your attention...`);
     speak(`${greeting}, Sir. Systems online.`);
@@ -1882,7 +2060,7 @@ async function init() {
 
   // Periodic proactive checks (every 15 minutes)
   setInterval(async () => {
-    if (!settings.apiKey || !settings.asanaPat) return;
+    if (!getActiveKey() || !settings.asanaPat) return;
     try {
       const tasks = await asanaApi('/tasks?project=' + settings.asanaProjectGid + '&opt_fields=name,due_on,completed&completed_since=now');
       const overdue = (tasks.data || []).filter(t => t.due_on && new Date(t.due_on) < new Date() && !t.completed);
