@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F.R.I.D.A.Y. â Personal AI Assistant</title>
+<title>F.R.I.D.A.Y. — Personal AI Assistant</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 @font-face{font-family:'Orbitron';src:url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap')}
@@ -90,6 +90,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
   <div class="panel-box">
     <div class="panel-title">CONNECTORS</div>
     <div class="stat-row"><span>Command Center</span><span class="stat-val" id="cc-status">--</span></div>
+    <div class="stat-row"><span>Asana</span><span class="stat-val red" id="asana-status">OFFLINE</span></div>
     <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
     <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
     <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
@@ -140,6 +141,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 
   <div class="bottom-bar">
     <div class="connector-pill"><span class="dot" id="dot-cc"></span>CMD CENTER</div>
+    <div class="connector-pill"><span class="dot" id="dot-asana"></span>ASANA</div>
     <div class="connector-pill"><span class="dot" id="dot-gcal"></span>GCAL</div>
     <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
     <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
@@ -168,6 +170,14 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <input type="text" id="set-voice-id" placeholder="pFZP5JQG7iQjIQuC4Bku">
     </div>
     <div class="setting-group">
+      <label>ASANA PERSONAL ACCESS TOKEN</label>
+      <input type="password" id="set-asana-pat" placeholder="1/12345...">
+    </div>
+    <div class="setting-group">
+      <label>ASANA PROJECT GID</label>
+      <input type="text" id="set-asana-project" placeholder="1213654696710519">
+    </div>
+    <div class="setting-group">
       <label>CLAUDE MODEL</label>
       <select id="set-model">
         <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
@@ -189,7 +199,9 @@ let settings = {
   ccUrl: 'https://leadfinder-rho.vercel.app',
   elevenKey: '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
-  model: 'claude-sonnet-4-20250514'
+  model: 'claude-sonnet-4-20250514',
+  asanaPat: '',
+  asanaProjectGid: '1213654696710519'
 };
 let conversationHistory = [];
 let statsData = {};
@@ -254,6 +266,56 @@ const TOOLS = [
     name: 'refresh_data',
     description: 'Force refresh leads cache.',
     input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'create_asana_task',
+    description: 'Create a new task in Asana. Use this when asked to add a task, todo, action item, or reminder.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Task title' },
+        notes: { type: 'string', description: 'Task description/details' },
+        due_on: { type: 'string', description: 'Due date in YYYY-MM-DD format' },
+        assignee: { type: 'string', description: 'Assignee email or "me"', default: 'me' }
+      },
+      required: ['name']
+    }
+  },
+  {
+    name: 'list_asana_tasks',
+    description: 'List tasks from Asana project. Use when asked about tasks, todos, what needs doing, or task status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        completed: { type: 'boolean', description: 'If true show completed, if false show incomplete. Default false.', default: false }
+      }
+    }
+  },
+  {
+    name: 'update_asana_task',
+    description: 'Update an existing Asana task — mark complete, change due date, rename, add notes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_gid: { type: 'string', description: 'The Asana task GID to update' },
+        name: { type: 'string', description: 'New task name' },
+        notes: { type: 'string', description: 'New description' },
+        due_on: { type: 'string', description: 'New due date YYYY-MM-DD or null to clear' },
+        completed: { type: 'boolean', description: 'Mark complete (true) or incomplete (false)' }
+      },
+      required: ['task_gid']
+    }
+  },
+  {
+    name: 'search_asana_tasks',
+    description: 'Search for Asana tasks by keyword in name or description.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search text to find in task names/descriptions' }
+      },
+      required: ['query']
+    }
   }
 ];
 
@@ -282,17 +344,27 @@ CURRENT LIVE DATA:
 - Recent Leads: ${JSON.stringify(recentLeads)}
 
 CAPABILITIES (use your tools when asked):
-1. deploy_scout â Find new leads in a region
-2. send_emails â Send outreach emails
-3. update_lead â Update lead status/notes
-4. get_lead_detail â Look up a lead
-5. refresh_data â Refresh cache
+SALES OPS:
+1. deploy_scout — Find new leads in a region
+2. send_emails — Send outreach emails
+3. update_lead — Update lead status/notes
+4. get_lead_detail — Look up a lead
+5. refresh_data — Refresh cache
 
-INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%â27%. Edblad -67% processing. 6-step email sequence.
+TASK MANAGEMENT (Asana):
+6. create_asana_task — Create tasks, todos, action items, reminders
+7. list_asana_tasks — Show current tasks and their status
+8. update_asana_task — Update, complete, reschedule tasks
+9. search_asana_tasks — Search tasks by keyword
+
+Asana Project: Arenzo (GID: ${settings.asanaProjectGid})
+Asana Connected: ${settings.asanaPat ? 'YES' : 'NO'}
+
+INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%→27%. Edblad -67% processing. 6-step email sequence.
 
 RULES:
 - Give concrete numbers from live data
-- Use tools when asked to take action â don't just describe
+- Use tools when asked to take action — don't just describe
 - Keep responses concise like an ops briefing
 - Flag risks: stale leads, low reply rates, sequence gaps
 - After actions, confirm with specifics`;
@@ -346,6 +418,8 @@ async function loadSettings() {
   document.getElementById('set-cc-url').value = settings.ccUrl || '';
   document.getElementById('set-eleven-key').value = settings.elevenKey || '';
   document.getElementById('set-voice-id').value = settings.voiceId || '';
+  document.getElementById('set-asana-pat').value = settings.asanaPat || '';
+  document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
 }
 
@@ -354,6 +428,8 @@ async function saveSettings() {
   settings.ccUrl = document.getElementById('set-cc-url').value.trim();
   settings.elevenKey = document.getElementById('set-eleven-key').value.trim();
   settings.voiceId = document.getElementById('set-voice-id').value.trim();
+  settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
+  settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
   settings.model = document.getElementById('set-model').value;
   await dbPut('settings', 'config', settings);
   closeSettings();
@@ -383,7 +459,75 @@ async function fetchLeads() {
   return false;
 }
 
+// ==================== ASANA API ====================
+async function asanaApi(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + settings.asanaPat,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  };
+  if (body) opts.body = JSON.stringify({ data: body });
+  const r = await fetch('https://app.asana.com/api/1.0' + path, opts);
+  const json = await r.json();
+  if (json.errors) throw new Error(json.errors.map(e => e.message).join(', '));
+  return json.data;
+}
+
+async function asanaCreateTask(params) {
+  const body = {
+    name: params.name,
+    projects: [settings.asanaProjectGid],
+    workspace: '1213677620858514'
+  };
+  if (params.notes) body.notes = params.notes;
+  if (params.due_on) body.due_on = params.due_on;
+  if (params.assignee) body.assignee = params.assignee === 'me' ? 'me' : params.assignee;
+  const task = await asanaApi('/tasks', 'POST', body);
+  return { success: true, task: { gid: task.gid, name: task.name, due_on: task.due_on, permalink_url: task.permalink_url } };
+}
+
+async function asanaListTasks(params) {
+  const completed = params.completed === true;
+  const fields = 'name,completed,due_on,assignee.name,notes';
+  const tasks = await asanaApi(`/projects/${settings.asanaProjectGid}/tasks?completed_since=${completed ? '' : 'now'}&opt_fields=${fields}`);
+  const filtered = completed ? tasks : tasks.filter(t => !t.completed);
+  return { success: true, count: filtered.length, tasks: filtered.map(t => ({
+    gid: t.gid, name: t.name, completed: t.completed,
+    due_on: t.due_on, assignee: t.assignee ? t.assignee.name : 'Unassigned',
+    notes: (t.notes || '').substring(0, 100)
+  }))};
+}
+
+async function asanaUpdateTask(params) {
+  const body = {};
+  if (params.name !== undefined) body.name = params.name;
+  if (params.notes !== undefined) body.notes = params.notes;
+  if (params.due_on !== undefined) body.due_on = params.due_on;
+  if (params.completed !== undefined) body.completed = params.completed;
+  const task = await asanaApi(`/tasks/${params.task_gid}`, 'PUT', body);
+  return { success: true, task: { gid: task.gid, name: task.name, completed: task.completed, due_on: task.due_on } };
+}
+
+async function asanaSearchTasks(params) {
+  const fields = 'name,completed,due_on,assignee.name';
+  const tasks = await asanaApi(`/workspaces/1213677620858514/tasks/search?text=${encodeURIComponent(params.query)}&opt_fields=${fields}`);
+  return { success: true, count: tasks.length, tasks: tasks.map(t => ({
+    gid: t.gid, name: t.name, completed: t.completed,
+    due_on: t.due_on, assignee: t.assignee ? t.assignee.name : 'Unassigned'
+  }))};
+}
+
 async function executeAction(name, params) {
+  // Route Asana tools
+  if (name === 'create_asana_task') return asanaCreateTask(params);
+  if (name === 'list_asana_tasks') return asanaListTasks(params);
+  if (name === 'update_asana_task') return asanaUpdateTask(params);
+  if (name === 'search_asana_tasks') return asanaSearchTasks(params);
+
+  // Command Center tools
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', {
     method: 'POST',
@@ -408,6 +552,17 @@ function updatePanels(ccOnline) {
   } else {
     ccEl.textContent = 'OFFLINE'; ccEl.className = 'stat-val red';
     dotCc.className = 'dot';
+  }
+
+  // Asana status
+  const asanaEl = document.getElementById('asana-status');
+  const dotAsana = document.getElementById('dot-asana');
+  if (settings.asanaPat) {
+    asanaEl.textContent = 'ONLINE'; asanaEl.className = 'stat-val green';
+    dotAsana.className = 'dot online';
+  } else {
+    asanaEl.textContent = 'NO KEY'; asanaEl.className = 'stat-val red';
+    dotAsana.className = 'dot';
   }
 
   // Engine status
@@ -581,8 +736,8 @@ async function startRecording() {
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      // For now, show a message â STT would need Whisper API
-      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon â please type for now.');
+      // For now, show a message — STT would need Whisper API
+      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon — please type for now.');
     };
     mediaRecorder.start();
     isRecording = true;
@@ -610,12 +765,12 @@ function addMsg(type, text, tools) {
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
 
   let label = type === 'friday' ? 'F.R.I.D.A.Y.' : 'YOU';
-  let html = `<div class="msg-label">${label} â ${timeStr}</div>`;
+  let html = `<div class="msg-label">${label} — ${timeStr}</div>`;
   html += text.replace(/\n/g, '<br>');
 
   if (tools && tools.length > 0) {
     html += '<div style="margin-top:8px">';
-    tools.forEach(t => { html += `<span class="tool-badge">â¡ ${t}</span>`; });
+    tools.forEach(t => { html += `<span class="tool-badge">⚡ ${t}</span>`; });
     html += '</div>';
   }
 
@@ -705,11 +860,12 @@ async function init() {
   let greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   if (!settings.apiKey) {
-    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (â) and enter your Anthropic API key to activate full operations.`);
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your Anthropic API key to activate full operations.`);
   } else {
     const leadCount = leadsData.length;
     const newCount = leadsData.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
-    addMsg('friday', `${greeting}, Sir. All systems operational. I'm connected directly to Claude and the Command Center. ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
+    const asanaMsg = settings.asanaPat ? ' Asana task management is live.' : '';
+    addMsg('friday', `${greeting}, Sir. All systems operational. I'm connected to Claude, Command Center, and task ops.${asanaMsg} ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
     speak(`${greeting}, Sir. All systems operational. ${leadCount} leads in pipeline. What are we working on?`);
   }
 }
