@@ -745,15 +745,28 @@ async function dbCount(store) {
 }
 
 async function loadSettings() {
-  let saved = await dbGet('settings', 'config');
-  // Fallback: try localStorage backup if IndexedDB is empty
+  let saved = null;
+  // PRIMARY: localStorage (synchronous, always available, never gets wiped by browser)
+  try {
+    const ls = localStorage.getItem('FRIDAY_SETTINGS');
+    if (ls) saved = JSON.parse(ls);
+  } catch(e) {}
+  // FALLBACK: IndexedDB
+  if (!saved) {
+    saved = await dbGet('settings', 'config');
+  }
+  // FALLBACK 2: old localStorage key
   if (!saved) {
     try {
-      const backup = localStorage.getItem('FRIDAY_SETTINGS_BACKUP');
-      if (backup) saved = JSON.parse(backup);
+      const old = localStorage.getItem('FRIDAY_SETTINGS_BACKUP');
+      if (old) saved = JSON.parse(old);
     } catch(e) {}
   }
-  if (saved) settings = { ...settings, ...saved };
+  if (saved) {
+    settings = { ...settings, ...saved };
+    // Sync to both storage backends
+    persistSettings();
+  }
   document.getElementById('set-api-key').value = settings.apiKey || '';
   document.getElementById('set-cc-url').value = settings.ccUrl || '';
   document.getElementById('set-eleven-key').value = settings.elevenKey || '';
@@ -774,24 +787,8 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
-  settings.apiKey = document.getElementById('set-api-key').value.trim();
-  settings.ccUrl = document.getElementById('set-cc-url').value.trim();
-  settings.elevenKey = document.getElementById('set-eleven-key').value.trim();
-  settings.voiceId = document.getElementById('set-voice-id').value.trim();
-  settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
-  settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
-  settings.model = document.getElementById('set-model').value;
-  settings.braveKey = document.getElementById('set-brave-key').value.trim();
-  settings.obsidianUrl = document.getElementById('set-obsidian-url').value.trim() || 'https://127.0.0.1:27124';
-  settings.obsidianKey = document.getElementById('set-obsidian-key').value.trim();
-  settings.obsidianFolder = document.getElementById('set-obsidian-folder').value.trim() || 'FRIDAY/Memory';
-  settings.gmailToken = document.getElementById('set-gmail-token').value.trim();
-  settings.gmailEmail = document.getElementById('set-gmail-email').value.trim();
-  settings.outlookToken = document.getElementById('set-outlook-token').value.trim();
-  settings.outlookEmail = document.getElementById('set-outlook-email').value.trim();
-  settings.notifEnabled = document.getElementById('set-notif-enabled').value;
-  settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
-  await dbPut('settings', 'config', settings);
+  readSettingsFromDOM();
+  persistSettings();
   closeSettings();
   refreshData();
   startNotificationLoop();
@@ -801,32 +798,48 @@ async function saveSettings() {
 
 // ==================== AUTO-SAVE SETTINGS ====================
 let autoSaveTimer = null;
+
+function readSettingsFromDOM() {
+  settings.apiKey = (document.getElementById('set-api-key').value || '').trim();
+  settings.ccUrl = (document.getElementById('set-cc-url').value || '').trim();
+  settings.elevenKey = (document.getElementById('set-eleven-key').value || '').trim();
+  settings.voiceId = (document.getElementById('set-voice-id').value || '').trim();
+  settings.asanaPat = (document.getElementById('set-asana-pat').value || '').trim();
+  settings.asanaProjectGid = (document.getElementById('set-asana-project').value || '').trim() || '1213654696710519';
+  settings.model = document.getElementById('set-model').value;
+  settings.braveKey = (document.getElementById('set-brave-key').value || '').trim();
+  settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'https://127.0.0.1:27124';
+  settings.obsidianKey = (document.getElementById('set-obsidian-key').value || '').trim();
+  settings.obsidianFolder = (document.getElementById('set-obsidian-folder').value || '').trim() || 'FRIDAY/Memory';
+  settings.gmailToken = (document.getElementById('set-gmail-token').value || '').trim();
+  settings.gmailEmail = (document.getElementById('set-gmail-email').value || '').trim();
+  settings.outlookToken = (document.getElementById('set-outlook-token').value || '').trim();
+  settings.outlookEmail = (document.getElementById('set-outlook-email').value || '').trim();
+  settings.notifEnabled = document.getElementById('set-notif-enabled').value;
+  settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
+}
+
+function persistSettings() {
+  // ALWAYS save to localStorage immediately (synchronous, reliable)
+  try { localStorage.setItem('FRIDAY_SETTINGS', JSON.stringify(settings)); } catch(e) {}
+  // Also save to IndexedDB (async)
+  if (db) {
+    try { dbPut('settings', 'config', settings); } catch(e) {}
+  }
+}
+
 function autoSaveSettings() {
+  // Instant save to localStorage on every keystroke
+  readSettingsFromDOM();
+  try { localStorage.setItem('FRIDAY_SETTINGS', JSON.stringify(settings)); } catch(e) {}
+  // Debounced save to IndexedDB
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(async () => {
-    settings.apiKey = document.getElementById('set-api-key').value.trim();
-    settings.ccUrl = document.getElementById('set-cc-url').value.trim();
-    settings.elevenKey = document.getElementById('set-eleven-key').value.trim();
-    settings.voiceId = document.getElementById('set-voice-id').value.trim();
-    settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
-    settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
-    settings.model = document.getElementById('set-model').value;
-    settings.braveKey = document.getElementById('set-brave-key').value.trim();
-    settings.obsidianUrl = document.getElementById('set-obsidian-url').value.trim() || 'https://127.0.0.1:27124';
-    settings.obsidianKey = document.getElementById('set-obsidian-key').value.trim();
-    settings.obsidianFolder = document.getElementById('set-obsidian-folder').value.trim() || 'FRIDAY/Memory';
-    settings.gmailToken = document.getElementById('set-gmail-token').value.trim();
-    settings.gmailEmail = document.getElementById('set-gmail-email').value.trim();
-    settings.outlookToken = document.getElementById('set-outlook-token').value.trim();
-    settings.outlookEmail = document.getElementById('set-outlook-email').value.trim();
-    settings.notifEnabled = document.getElementById('set-notif-enabled').value;
-    settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
-    await dbPut('settings', 'config', settings);
-    // Also save to localStorage as backup
-    try { localStorage.setItem('FRIDAY_SETTINGS_BACKUP', JSON.stringify(settings)); } catch(e) {}
+    readSettingsFromDOM();
+    persistSettings();
     const ind = document.getElementById('autosave-indicator');
     if (ind) { ind.style.opacity = '1'; setTimeout(() => ind.style.opacity = '0', 1500); }
-  }, 800); // 800ms debounce
+  }, 500);
 }
 
 function initAutoSave() {
@@ -836,7 +849,14 @@ function initAutoSave() {
     if (el) {
       el.addEventListener('input', autoSaveSettings);
       el.addEventListener('change', autoSaveSettings);
+      // Also catch paste events
+      el.addEventListener('paste', () => setTimeout(autoSaveSettings, 50));
     }
+  });
+  // Save when page unloads (safety net)
+  window.addEventListener('beforeunload', () => {
+    readSettingsFromDOM();
+    try { localStorage.setItem('FRIDAY_SETTINGS', JSON.stringify(settings)); } catch(e) {}
   });
 }
 
@@ -1715,7 +1735,12 @@ async function sendMessage() {
 }
 
 function openSettings() { document.getElementById('settings-overlay').classList.add('open'); }
-function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
+function closeSettings() {
+  // Always save when closing settings panel
+  readSettingsFromDOM();
+  persistSettings();
+  document.getElementById('settings-overlay').classList.remove('open');
+}
 
 // ==================== CLOCK & UPTIME ====================
 function updateClock() {
