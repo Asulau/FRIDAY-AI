@@ -153,22 +153,38 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="setting-group">
       <label>AI PROVIDER</label>
       <select id="set-provider" onchange="toggleProviderFields()">
-        <option value="gemini">Google Gemini (FREE)</option>
+        <option value="groq">Groq — Llama 3.3 (TRULY FREE ✓)</option>
+        <option value="gemini">Google Gemini (Free tier)</option>
         <option value="anthropic">Anthropic Claude (Paid)</option>
       </select>
     </div>
-    <div class="setting-group" id="group-gemini-key">
-      <label>GEMINI API KEY <span style="color:var(--green);font-size:9px">(FREE — get at aistudio.google.com)</span></label>
+    <!-- Groq -->
+    <div class="setting-group" id="group-groq-key">
+      <label>GROQ API KEY <span style="color:var(--green);font-size:9px">(FREE — get at console.groq.com)</span></label>
+      <input type="password" id="set-groq-key" placeholder="gsk_...">
+    </div>
+    <div class="setting-group" id="group-groq-model">
+      <label>GROQ MODEL</label>
+      <select id="set-groq-model">
+        <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Recommended)</option>
+        <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fastest)</option>
+        <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+      </select>
+    </div>
+    <!-- Gemini -->
+    <div class="setting-group" id="group-gemini-key" style="display:none">
+      <label>GEMINI API KEY <span style="color:var(--green);font-size:9px">(get at aistudio.google.com)</span></label>
       <input type="password" id="set-gemini-key" placeholder="AIza...">
     </div>
-    <div class="setting-group" id="group-gemini-model">
+    <div class="setting-group" id="group-gemini-model" style="display:none">
       <label>GEMINI MODEL</label>
       <select id="set-gemini-model">
-        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
-        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (Faster)</option>
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
         <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
       </select>
     </div>
+    <!-- Anthropic -->
     <div class="setting-group" id="group-api-key" style="display:none">
       <label>ANTHROPIC API KEY</label>
       <input type="password" id="set-api-key" placeholder="sk-ant-...">
@@ -211,7 +227,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <h2 style="font-size:12px;margin-bottom:12px">OBSIDIAN MEMORY BANK</h2>
     <div class="setting-group">
       <label>OBSIDIAN REST API URL</label>
-      <input type="text" id="set-obsidian-url" placeholder="https://127.0.0.1:27124">
+      <input type="text" id="set-obsidian-url" placeholder="http://127.0.0.1:27123">
     </div>
     <div class="setting-group">
       <label>OBSIDIAN API KEY</label>
@@ -263,10 +279,12 @@ const DB_NAME = 'FRIDAY_DB';
 const DB_VERSION = 2;
 let db = null;
 let settings = {
-  provider: 'gemini',
+  provider: 'groq',
   apiKey: '',
   geminiKey: '',
   geminiModel: 'gemini-2.0-flash',
+  groqKey: '',
+  groqModel: 'llama-3.3-70b-versatile',
   ccUrl: 'https://leadfinder-rho.vercel.app',
   elevenKey: '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
@@ -274,7 +292,7 @@ let settings = {
   asanaPat: '',
   asanaProjectGid: '1213654696710519',
   braveKey: '',
-  obsidianUrl: 'https://127.0.0.1:27124',
+  obsidianUrl: 'http://127.0.0.1:27123',
   obsidianKey: '',
   obsidianFolder: 'FRIDAY/Memory',
   gmailToken: '',
@@ -789,7 +807,9 @@ async function loadSettings() {
     // Sync to both storage backends
     persistSettings();
   }
-  document.getElementById('set-provider').value = settings.provider || 'gemini';
+  document.getElementById('set-provider').value = settings.provider || 'groq';
+  document.getElementById('set-groq-key').value = settings.groqKey || '';
+  document.getElementById('set-groq-model').value = settings.groqModel || 'llama-3.3-70b-versatile';
   document.getElementById('set-gemini-key').value = settings.geminiKey || '';
   document.getElementById('set-gemini-model').value = settings.geminiModel || 'gemini-2.0-flash';
   document.getElementById('set-api-key').value = settings.apiKey || '';
@@ -800,7 +820,7 @@ async function loadSettings() {
   document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
   document.getElementById('set-brave-key').value = settings.braveKey || '';
-  document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'https://127.0.0.1:27124';
+  document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'http://127.0.0.1:27123';
   document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
   document.getElementById('set-obsidian-folder').value = settings.obsidianFolder || 'FRIDAY/Memory';
   document.getElementById('set-gmail-token').value = settings.gmailToken || '';
@@ -826,6 +846,8 @@ let autoSaveTimer = null;
 
 function readSettingsFromDOM() {
   settings.provider = document.getElementById('set-provider').value;
+  settings.groqKey = (document.getElementById('set-groq-key').value || '').trim();
+  settings.groqModel = document.getElementById('set-groq-model').value;
   settings.geminiKey = (document.getElementById('set-gemini-key').value || '').trim();
   settings.geminiModel = document.getElementById('set-gemini-model').value;
   settings.apiKey = (document.getElementById('set-api-key').value || '').trim();
@@ -836,7 +858,7 @@ function readSettingsFromDOM() {
   settings.asanaProjectGid = (document.getElementById('set-asana-project').value || '').trim() || '1213654696710519';
   settings.model = document.getElementById('set-model').value;
   settings.braveKey = (document.getElementById('set-brave-key').value || '').trim();
-  settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'https://127.0.0.1:27124';
+  settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'http://127.0.0.1:27123';
   settings.obsidianKey = (document.getElementById('set-obsidian-key').value || '').trim();
   settings.obsidianFolder = (document.getElementById('set-obsidian-folder').value || '').trim() || 'FRIDAY/Memory';
   settings.gmailToken = (document.getElementById('set-gmail-token').value || '').trim();
@@ -871,7 +893,7 @@ function autoSaveSettings() {
 }
 
 function initAutoSave() {
-  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
+  const ids = ['set-provider','set-groq-key','set-groq-model','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -972,7 +994,7 @@ async function asanaSearchTasks(params) {
 
 // ==================== OBSIDIAN MEMORY BANK ====================
 async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
-  if (!settings.obsidianKey) throw new Error('Obsidian not configured. Add your Obsidian REST API key in Settings. Enable the Local REST API plugin in Obsidian.');
+  if (!settings.obsidianKey) throw new Error('Obsidian not configured — add your API key in Settings.');
   const opts = {
     method,
     headers: {
@@ -981,35 +1003,42 @@ async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 
       'Accept': 'application/json'
     }
   };
-  if (body && contentType === 'application/json') opts.body = JSON.stringify(body);
-  if (body && contentType !== 'application/json') opts.body = body;
+  if (body) opts.body = (contentType === 'application/json') ? JSON.stringify(body) : body;
 
-  // Try configured URL first, then fallback HTTP if HTTPS fails (self-signed cert issue)
-  const urls = [settings.obsidianUrl];
-  if (settings.obsidianUrl.startsWith('https://')) {
-    urls.push(settings.obsidianUrl.replace('https://', 'http://').replace(':27124', ':27123'));
-  }
+  // Build candidate URLs in priority order: HTTP first (no cert issues), then HTTPS
+  const base = settings.obsidianUrl || 'http://127.0.0.1:27123';
+  const candidates = new Set();
+  candidates.add(base);
+  // Always try HTTP 27123 (no cert issue, works from HTTPS pages via localhost exemption)
+  candidates.add('http://127.0.0.1:27123');
+  candidates.add('http://localhost:27123');
+  // HTTPS fallbacks (requires cert bypass in browser)
+  candidates.add('https://127.0.0.1:27124');
+  candidates.add('https://localhost:27124');
+
   let lastErr = null;
-  for (const baseUrl of urls) {
+  for (const baseUrl of candidates) {
     try {
-      const r = await fetch(baseUrl + endpoint, opts);
+      const r = await fetch(baseUrl + endpoint, { ...opts });
       if (!r.ok) {
         const err = await r.text();
         throw new Error('Obsidian API error (' + r.status + '): ' + err.substring(0, 200));
       }
       const text = await r.text();
-      // If we succeeded on fallback URL, update settings
+      // Remember the working URL
       if (baseUrl !== settings.obsidianUrl) {
         settings.obsidianUrl = baseUrl;
-        dbPut('settings', 'config', settings);
+        persistSettings();
       }
       try { return JSON.parse(text); } catch(e) { return { content: text }; }
     } catch(e) {
       lastErr = e;
+      // Only continue to next candidate if it's a connection/cert error, not an API error
+      if (e.message.includes('Obsidian API error')) throw e;
       continue;
     }
   }
-  throw new Error('Cannot connect to Obsidian. Make sure the Local REST API plugin is running. If using HTTPS, visit ' + settings.obsidianUrl + ' in your browser first and accept the certificate. Error: ' + (lastErr ? lastErr.message : 'unknown'));
+  throw new Error('Cannot reach Obsidian. Make sure: 1) Obsidian is open, 2) Local REST API plugin is installed & enabled. Error: ' + (lastErr ? lastErr.message.substring(0, 100) : 'unknown'));
 }
 
 async function memoryStore(params) {
@@ -1464,7 +1493,8 @@ function updatePanels(ccOnline) {
   const engineEl = document.getElementById('engine');
   const activeKey = getActiveKey();
   if (activeKey) {
-    engineEl.textContent = settings.provider === 'gemini' ? 'GEMINI' : 'ANTHROPIC';
+    const labels = { groq: 'GROQ/LLAMA', gemini: 'GEMINI', anthropic: 'ANTHROPIC' };
+    engineEl.textContent = labels[settings.provider] || 'ONLINE';
     engineEl.className = 'stat-val green';
   } else {
     engineEl.textContent = 'NO KEY'; engineEl.className = 'stat-val red';
@@ -1540,11 +1570,13 @@ function updatePanels(ccOnline) {
 
 // ==================== PROVIDER TOGGLE ====================
 function toggleProviderFields() {
-  const isGemini = document.getElementById('set-provider').value === 'gemini';
-  document.getElementById('group-gemini-key').style.display = isGemini ? '' : 'none';
-  document.getElementById('group-gemini-model').style.display = isGemini ? '' : 'none';
-  document.getElementById('group-api-key').style.display = isGemini ? 'none' : '';
-  document.getElementById('group-model').style.display = isGemini ? 'none' : '';
+  const p = document.getElementById('set-provider').value;
+  document.getElementById('group-groq-key').style.display = p === 'groq' ? '' : 'none';
+  document.getElementById('group-groq-model').style.display = p === 'groq' ? '' : 'none';
+  document.getElementById('group-gemini-key').style.display = p === 'gemini' ? '' : 'none';
+  document.getElementById('group-gemini-model').style.display = p === 'gemini' ? '' : 'none';
+  document.getElementById('group-api-key').style.display = p === 'anthropic' ? '' : 'none';
+  document.getElementById('group-model').style.display = p === 'anthropic' ? '' : 'none';
 }
 
 // ==================== GEMINI TOOL FORMAT CONVERTER ====================
@@ -1572,20 +1604,124 @@ function resetGeminiHistory() {
 
 // ==================== AI API (MULTI-PROVIDER) ====================
 function getActiveKey() {
-  return settings.provider === 'gemini' ? settings.geminiKey : settings.apiKey;
+  if (settings.provider === 'groq') return settings.groqKey;
+  if (settings.provider === 'gemini') return settings.geminiKey;
+  return settings.apiKey;
 }
 
 async function callClaude(userMessage) {
   const activeKey = getActiveKey();
   if (!activeKey) {
-    const provider = settings.provider === 'gemini' ? 'Gemini' : 'Anthropic';
-    return { text: `I need an API key to connect, Sir. Open Settings and enter your ${provider} API key. ${settings.provider === 'gemini' ? 'It\'s free at aistudio.google.com/apikey' : ''}`, tools: [] };
+    const hints = {
+      groq: 'Get a free key at console.groq.com — no credit card needed.',
+      gemini: 'Get a key at aistudio.google.com/apikey',
+      anthropic: 'Get a key at console.anthropic.com/settings/keys'
+    };
+    return { text: `No API key set, Sir. Open Settings (⚙) and enter your key. ${hints[settings.provider] || ''}`, tools: [] };
+  }
+  if (settings.provider === 'groq') return callGroq(userMessage);
+  if (settings.provider === 'gemini') return callGemini(userMessage);
+  return callAnthropic(userMessage);
+}
+
+// ==================== GROQ API (OpenAI-compatible, truly free) ====================
+function toolsToOpenAI() {
+  return TOOLS.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: {
+        type: 'object',
+        properties: t.input_schema.properties || {},
+        required: t.input_schema.required || []
+      }
+    }
+  }));
+}
+
+let groqHistory = [];
+
+async function callGroq(userMessage) {
+  groqHistory.push({ role: 'user', content: userMessage });
+  conversationHistory.push({ role: 'user', content: userMessage });
+
+  const model = settings.groqModel || 'llama-3.3-70b-versatile';
+  const systemPrompt = buildSystemPrompt();
+  let toolsUsed = [];
+  let iterations = 0;
+
+  async function makeRequest(messages) {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + settings.groqKey
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-30)],
+        tools: toolsToOpenAI(),
+        tool_choice: 'auto',
+        max_tokens: 4096,
+        temperature: 0.7
+      })
+    });
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error('Groq error (' + r.status + '): ' + err.substring(0, 300));
+    }
+    return r.json();
   }
 
-  if (settings.provider === 'gemini') {
-    return callGemini(userMessage);
-  } else {
-    return callAnthropic(userMessage);
+  try {
+    let data = await makeRequest(groqHistory);
+
+    while (iterations < 12) {
+      const choice = data.choices && data.choices[0];
+      if (!choice) break;
+      const msg = choice.message;
+      const toolCalls = msg.tool_calls || [];
+
+      groqHistory.push(msg);
+
+      if (toolCalls.length === 0 || choice.finish_reason === 'stop') {
+        const text = msg.content || 'Done.';
+        conversationHistory.push({ role: 'assistant', content: [{ type: 'text', text }] });
+        if (toolsUsed.length > 0) refreshData();
+        return { text, tools: toolsUsed };
+      }
+
+      iterations++;
+      const toolResults = [];
+      for (const tc of toolCalls) {
+        const name = tc.function.name;
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch(e) {}
+        toolsUsed.push(name);
+
+        let result;
+        try { result = await executeAction(name, args); }
+        catch(e) { result = { success: false, error: e.message }; }
+
+        toolResults.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify(result)
+        });
+      }
+
+      groqHistory.push(...toolResults);
+      data = await makeRequest(groqHistory);
+    }
+
+    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'Done.';
+    conversationHistory.push({ role: 'assistant', content: [{ type: 'text', text }] });
+    if (toolsUsed.length > 0) refreshData();
+    return { text, tools: toolsUsed };
+
+  } catch(e) {
+    return { text: 'Error: ' + e.message, tools: toolsUsed };
   }
 }
 
