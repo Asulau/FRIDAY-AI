@@ -65,10 +65,9 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 .settings-save{background:var(--cyan);color:var(--bg);border:none;padding:10px 24px;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:11px;cursor:pointer;letter-spacing:2px;margin-top:8px}
 .settings-save:hover{opacity:.8}
 .settings-close{float:right;background:none;border:none;color:var(--red);font-size:18px;cursor:pointer}
-/* ORBITAL ANIMATION */
-.orbital-container{position:absolute;top:50%;left:40%;transform:translate(-50%,-50%);pointer-events:none;opacity:.08}
-.orbital{border:1px solid var(--cyan);border-radius:50%;position:absolute;animation:spin linear infinite}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+/* ORB VISUALIZATION */
+.orb-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:0}
+.orb-container canvas{display:block}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:var(--bg)}
@@ -94,6 +93,8 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
     <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
     <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
+    <div class="stat-row"><span>Web Search</span><span class="stat-val red" id="web-status">OFFLINE</span></div>
+    <div class="stat-row"><span>Obsidian</span><span class="stat-val red" id="obsidian-status">OFFLINE</span></div>
   </div>
   <div class="panel-box">
     <div class="panel-title">PIPELINE</div>
@@ -113,11 +114,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 <!-- MAIN -->
 <div class="main-area">
   <!-- Orbital bg -->
-  <div class="orbital-container">
-    <div class="orbital" style="width:200px;height:200px;top:-100px;left:-100px;animation-duration:20s"></div>
-    <div class="orbital" style="width:350px;height:350px;top:-175px;left:-175px;animation-duration:35s"></div>
-    <div class="orbital" style="width:500px;height:500px;top:-250px;left:-250px;animation-duration:55s"></div>
-  </div>
+  <div class="orb-container"><canvas id="orb" width="300" height="300"></canvas></div>
 
   <div class="header">
     <div>
@@ -185,6 +182,57 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
         <option value="claude-haiku-4-20250307">Claude Haiku 4</option>
       </select>
     </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h2 style="font-size:12px;margin-bottom:12px">WEB SEARCH</h2>
+    <div class="setting-group">
+      <label>BRAVE SEARCH API KEY</label>
+      <input type="password" id="set-brave-key" placeholder="BSA...">
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h2 style="font-size:12px;margin-bottom:12px">OBSIDIAN MEMORY BANK</h2>
+    <div class="setting-group">
+      <label>OBSIDIAN REST API URL</label>
+      <input type="text" id="set-obsidian-url" placeholder="https://127.0.0.1:27124">
+    </div>
+    <div class="setting-group">
+      <label>OBSIDIAN API KEY</label>
+      <input type="password" id="set-obsidian-key" placeholder="Your Obsidian REST API key">
+    </div>
+    <div class="setting-group">
+      <label>MEMORY VAULT FOLDER</label>
+      <input type="text" id="set-obsidian-folder" placeholder="FRIDAY/Memory">
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h2 style="font-size:12px;margin-bottom:12px">EMAIL INTEGRATIONS</h2>
+    <div class="setting-group">
+      <label>GMAIL ACCESS TOKEN</label>
+      <input type="password" id="set-gmail-token" placeholder="ya29.a0...">
+    </div>
+    <div class="setting-group">
+      <label>GMAIL SENDER EMAIL</label>
+      <input type="text" id="set-gmail-email" placeholder="you@gmail.com">
+    </div>
+    <div class="setting-group">
+      <label>OUTLOOK ACCESS TOKEN</label>
+      <input type="password" id="set-outlook-token" placeholder="EwB...">
+    </div>
+    <div class="setting-group">
+      <label>OUTLOOK SENDER EMAIL</label>
+      <input type="text" id="set-outlook-email" placeholder="you@outlook.com">
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h2 style="font-size:12px;margin-bottom:12px">NOTIFICATIONS</h2>
+    <div class="setting-group">
+      <label>TASK NOTIFICATIONS</label>
+      <select id="set-notif-enabled">
+        <option value="on">ENABLED</option>
+        <option value="off">DISABLED</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>CHECK INTERVAL (MINUTES)</label>
+      <input type="number" id="set-notif-interval" placeholder="30" min="5" max="1440">
+    </div>
     <button class="settings-save" onclick="saveSettings()">SAVE CONFIGURATION</button>
   </div>
 </div>
@@ -201,7 +249,17 @@ let settings = {
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
   model: 'claude-sonnet-4-20250514',
   asanaPat: '',
-  asanaProjectGid: '1213654696710519'
+  asanaProjectGid: '1213654696710519',
+  braveKey: '',
+  obsidianUrl: 'https://127.0.0.1:27124',
+  obsidianKey: '',
+  obsidianFolder: 'FRIDAY/Memory',
+  gmailToken: '',
+  gmailEmail: '',
+  outlookToken: '',
+  outlookEmail: '',
+  notifEnabled: 'on',
+  notifInterval: 30
 };
 let conversationHistory = [];
 let statsData = {};
@@ -211,6 +269,104 @@ let sessionCount = 0;
 let messageCount = 0;
 let isRecording = false;
 let mediaRecorder = null;
+let orbState = 'idle'; // idle | thinking | speaking
+let notifTimer = null;
+let lastNotifCheck = 0;
+
+// ==================== ORB ====================
+(function initOrb() {
+  const canvas = document.getElementById('orb');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, cx = W/2, cy = H/2;
+  let t = 0;
+  const particles = [];
+  for (let i = 0; i < 60; i++) {
+    particles.push({
+      angle: Math.random() * Math.PI * 2,
+      radius: 40 + Math.random() * 30,
+      speed: 0.003 + Math.random() * 0.008,
+      size: 1 + Math.random() * 2,
+      offset: Math.random() * Math.PI * 2
+    });
+  }
+
+  function draw() {
+    t += 0.016;
+    ctx.clearRect(0, 0, W, H);
+
+    // Breathing factor based on state
+    let breathSpeed = 1.2, breathAmp = 0.08, glowIntensity = 0.4, coreAlpha = 0.25;
+    let r = 0, g = 240, b = 255; // cyan
+    if (orbState === 'thinking') {
+      breathSpeed = 3; breathAmp = 0.15; glowIntensity = 0.7; coreAlpha = 0.4;
+      r = 120; g = 100; b = 255; // purple
+    } else if (orbState === 'speaking') {
+      breathSpeed = 2; breathAmp = 0.12; glowIntensity = 0.6; coreAlpha = 0.35;
+      r = 0; g = 255; b = 136; // green
+    }
+
+    const breath = 1 + Math.sin(t * breathSpeed) * breathAmp;
+    const baseR = 45 * breath;
+
+    // Outer glow
+    const grd3 = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 2.5);
+    grd3.addColorStop(0, `rgba(${r},${g},${b},${glowIntensity * 0.15})`);
+    grd3.addColorStop(0.5, `rgba(${r},${g},${b},${glowIntensity * 0.05})`);
+    grd3.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd3;
+    ctx.fillRect(0, 0, W, H);
+
+    // Core orb
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
+    grd.addColorStop(0, `rgba(${r},${g},${b},${coreAlpha})`);
+    grd.addColorStop(0.6, `rgba(${r},${g},${b},${coreAlpha * 0.5})`);
+    grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx.beginPath();
+    ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // Inner bright core
+    const grd2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 0.4);
+    grd2.addColorStop(0, `rgba(255,255,255,${coreAlpha * 0.6})`);
+    grd2.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx.beginPath();
+    ctx.arc(cx, cy, baseR * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = grd2;
+    ctx.fill();
+
+    // Orbiting ring
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, baseR * 1.6, baseR * 0.5, t * 0.3, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${r},${g},${b},${0.08 + Math.sin(t) * 0.04})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Second ring
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, baseR * 2, baseR * 0.7, -t * 0.2, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${r},${g},${b},${0.05 + Math.sin(t * 1.3) * 0.03})`;
+    ctx.stroke();
+
+    // Particles
+    for (const p of particles) {
+      p.angle += p.speed * (orbState === 'thinking' ? 2.5 : 1);
+      const wobble = Math.sin(t * 2 + p.offset) * 8;
+      const pr = p.radius * breath + wobble;
+      const px = cx + Math.cos(p.angle) * pr;
+      const py = cy + Math.sin(p.angle) * pr * 0.6;
+      const pa = 0.15 + Math.sin(t * 3 + p.offset) * 0.1;
+      ctx.beginPath();
+      ctx.arc(px, py, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${pa})`;
+      ctx.fill();
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
 
 // ==================== TOOLS ====================
 const TOOLS = [
@@ -316,6 +472,161 @@ const TOOLS = [
       },
       required: ['query']
     }
+  },
+  // Gmail tools
+  {
+    name: 'list_gmail',
+    description: 'List recent emails from Gmail inbox. Use when asked about emails, inbox, or messages.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        maxResults: { type: 'number', description: 'Number of emails to fetch (max 20)', default: 10 },
+        query: { type: 'string', description: 'Gmail search query (e.g. "is:unread", "from:boss@co.com", "subject:invoice")' }
+      }
+    }
+  },
+  {
+    name: 'read_gmail',
+    description: 'Read a specific Gmail email by ID. Use to get the full body of an email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        messageId: { type: 'string', description: 'The Gmail message ID' }
+      },
+      required: ['messageId']
+    }
+  },
+  {
+    name: 'send_gmail',
+    description: 'Send an email via Gmail. Use when asked to compose, send, or reply to emails via Gmail.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'Recipient email address' },
+        subject: { type: 'string', description: 'Email subject line' },
+        body: { type: 'string', description: 'Email body (plain text)' },
+        cc: { type: 'string', description: 'CC recipients (comma separated)' },
+        replyToMessageId: { type: 'string', description: 'Message ID to reply to (optional)' }
+      },
+      required: ['to', 'subject', 'body']
+    }
+  },
+  // Outlook tools
+  {
+    name: 'list_outlook',
+    description: 'List recent emails from Outlook inbox. Use when asked about Outlook emails or Microsoft mail.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        maxResults: { type: 'number', description: 'Number of emails to fetch (max 20)', default: 10 },
+        filter: { type: 'string', description: 'OData filter (e.g. "isRead eq false", "from/emailAddress/address eq \'boss@co.com\'")' }
+      }
+    }
+  },
+  {
+    name: 'read_outlook',
+    description: 'Read a specific Outlook email by ID.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        messageId: { type: 'string', description: 'The Outlook message ID' }
+      },
+      required: ['messageId']
+    }
+  },
+  {
+    name: 'send_outlook',
+    description: 'Send an email via Outlook/Microsoft 365. Use when asked to send email via Outlook.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'Recipient email address' },
+        subject: { type: 'string', description: 'Email subject line' },
+        body: { type: 'string', description: 'Email body (plain text)' },
+        cc: { type: 'string', description: 'CC recipients (comma separated)' }
+      },
+      required: ['to', 'subject', 'body']
+    }
+  },
+  // Web tools
+  {
+    name: 'web_search',
+    description: 'Search the web using Brave Search. Use when asked to look something up, research a topic, find information online, or check current events.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+        count: { type: 'number', description: 'Number of results (max 10)', default: 5 }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'web_read',
+    description: 'Fetch and read the text content of a webpage URL. Use to read articles, docs, or any web page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The full URL to read' },
+        maxLength: { type: 'number', description: 'Max characters to return', default: 5000 }
+      },
+      required: ['url']
+    }
+  },
+  // Obsidian memory tools
+  {
+    name: 'memory_store',
+    description: 'Save information to the Obsidian memory bank. Use to remember facts, contact details, preferences, meeting notes, or any context that should persist across sessions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Note title (becomes filename). E.g. "Contact - John Smith" or "Preference - Email Style"' },
+        content: { type: 'string', description: 'Markdown content to store' },
+        tags: { type: 'string', description: 'Comma-separated tags for categorization. E.g. "contact,client,inretrn"' }
+      },
+      required: ['title', 'content']
+    }
+  },
+  {
+    name: 'memory_search',
+    description: 'Search the Obsidian memory bank for relevant context. Use BEFORE answering questions to check if you have stored knowledge about the topic, person, or company.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search text to find in memory notes' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'memory_read',
+    description: 'Read a specific note from the Obsidian memory bank by its path.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to the note relative to vault root' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'memory_list',
+    description: 'List all notes in the FRIDAY memory folder. Use to see what knowledge is stored.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  // Notification tool
+  {
+    name: 'check_important_tasks',
+    description: 'Check for overdue or high-priority tasks and trigger notifications. Use when asked to check deadlines or important items.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        includeToday: { type: 'boolean', description: 'Include tasks due today', default: true }
+      }
+    }
   }
 ];
 
@@ -357,17 +668,54 @@ TASK MANAGEMENT (Asana):
 8. update_asana_task — Update, complete, reschedule tasks
 9. search_asana_tasks — Search tasks by keyword
 
+GMAIL:
+10. list_gmail — List inbox emails, supports search queries
+11. read_gmail — Read full email by ID
+12. send_gmail — Send or reply to emails via Gmail
+
+OUTLOOK:
+13. list_outlook — List inbox emails with filters
+14. read_outlook — Read full email by ID
+15. send_outlook — Send emails via Outlook/Microsoft 365
+
+WEB:
+16. web_search — Search the web via Brave Search
+17. web_read — Fetch and read any webpage content
+
+MEMORY (Obsidian Vault):
+18. memory_store — Save facts, contacts, preferences, notes to persistent memory
+19. memory_search — Search memory for relevant context BEFORE answering
+20. memory_read — Read a specific memory note
+21. memory_list — List all stored memories
+
+NOTIFICATIONS:
+22. check_important_tasks — Check overdue/urgent tasks and send browser notifications
+
+MEMORY INSTRUCTIONS:
+- ALWAYS use memory_search before answering questions about people, companies, deals, or preferences
+- When you learn new facts about contacts, clients, or Laurence's preferences, store them with memory_store
+- Session logs are saved automatically — you can search past conversations
+- Use tags: "contact", "preference", "deal", "meeting", "insight", "process"
+
 Asana Project: Arenzo (GID: ${settings.asanaProjectGid})
 Asana Connected: ${settings.asanaPat ? 'YES' : 'NO'}
+Web Search: ${settings.braveKey ? 'YES (Brave)' : 'NO'}
+Obsidian Memory: ${settings.obsidianKey ? 'YES (Vault: ' + settings.obsidianFolder + ')' : 'NO'}
+Gmail Connected: ${settings.gmailToken ? 'YES (' + settings.gmailEmail + ')' : 'NO'}
+Outlook Connected: ${settings.outlookToken ? 'YES (' + settings.outlookEmail + ')' : 'NO'}
+Notifications: ${settings.notifEnabled === 'on' ? 'ON (every ' + settings.notifInterval + ' min)' : 'OFF'}
 
 INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%→27%. Edblad -67% processing. 6-step email sequence.
 
 RULES:
-- Give concrete numbers from live data
-- Use tools when asked to take action — don't just describe
-- Keep responses concise like an ops briefing
-- Flag risks: stale leads, low reply rates, sequence gaps
-- After actions, confirm with specifics`;
+- Keep responses SHORT and conversational — 2-3 sentences max unless detailed info is needed
+- Sound like a trusted colleague, not a report generator. Warm, personal, natural flow.
+- Use "Sir" sparingly — once per conversation at most, not every message
+- Give concrete numbers from live data when relevant
+- Use tools when asked to take action — don't just describe what you could do
+- No bullet points or lists unless the data requires it (like listing tasks)
+- Flag risks naturally: "Heads up, 3 leads have gone cold" not "ALERT: Lead status..."
+- After actions, confirm briefly: "Done, created the task for Thursday" not a full recap`;
 }
 
 // ==================== IndexedDB ====================
@@ -421,6 +769,16 @@ async function loadSettings() {
   document.getElementById('set-asana-pat').value = settings.asanaPat || '';
   document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
+  document.getElementById('set-brave-key').value = settings.braveKey || '';
+  document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'https://127.0.0.1:27124';
+  document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
+  document.getElementById('set-obsidian-folder').value = settings.obsidianFolder || 'FRIDAY/Memory';
+  document.getElementById('set-gmail-token').value = settings.gmailToken || '';
+  document.getElementById('set-gmail-email').value = settings.gmailEmail || '';
+  document.getElementById('set-outlook-token').value = settings.outlookToken || '';
+  document.getElementById('set-outlook-email').value = settings.outlookEmail || '';
+  document.getElementById('set-notif-enabled').value = settings.notifEnabled || 'on';
+  document.getElementById('set-notif-interval').value = settings.notifInterval || 30;
 }
 
 async function saveSettings() {
@@ -431,9 +789,20 @@ async function saveSettings() {
   settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
   settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
   settings.model = document.getElementById('set-model').value;
+  settings.braveKey = document.getElementById('set-brave-key').value.trim();
+  settings.obsidianUrl = document.getElementById('set-obsidian-url').value.trim() || 'https://127.0.0.1:27124';
+  settings.obsidianKey = document.getElementById('set-obsidian-key').value.trim();
+  settings.obsidianFolder = document.getElementById('set-obsidian-folder').value.trim() || 'FRIDAY/Memory';
+  settings.gmailToken = document.getElementById('set-gmail-token').value.trim();
+  settings.gmailEmail = document.getElementById('set-gmail-email').value.trim();
+  settings.outlookToken = document.getElementById('set-outlook-token').value.trim();
+  settings.outlookEmail = document.getElementById('set-outlook-email').value.trim();
+  settings.notifEnabled = document.getElementById('set-notif-enabled').value;
+  settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
   await dbPut('settings', 'config', settings);
   closeSettings();
   refreshData();
+  startNotificationLoop();
   addMsg('friday', 'Settings saved, Sir. Reconnecting systems...');
   setTimeout(init, 500);
 }
@@ -520,12 +889,437 @@ async function asanaSearchTasks(params) {
   }))};
 }
 
+// ==================== OBSIDIAN MEMORY BANK ====================
+async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
+  if (!settings.obsidianKey) throw new Error('Obsidian not configured. Add your Obsidian REST API key in Settings. Enable the Local REST API plugin in Obsidian.');
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + settings.obsidianKey,
+      'Content-Type': contentType,
+      'Accept': 'application/json'
+    }
+  };
+  if (body && contentType === 'application/json') opts.body = JSON.stringify(body);
+  if (body && contentType !== 'application/json') opts.body = body;
+  const r = await fetch(settings.obsidianUrl + endpoint, opts);
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error('Obsidian API error (' + r.status + '): ' + err.substring(0, 200));
+  }
+  const text = await r.text();
+  try { return JSON.parse(text); } catch(e) { return { content: text }; }
+}
+
+async function memoryStore(params) {
+  const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+  const safeName = params.title.replace(/[\/\\:*?"<>|]/g, '-');
+  const path = `${folder}/${safeName}.md`;
+
+  // Build frontmatter
+  const now = new Date().toISOString();
+  const tags = params.tags ? params.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  let md = `---\ncreated: ${now}\nupdated: ${now}\ntags: [${tags.map(t => `"${t}"`).join(', ')}]\nsource: FRIDAY\n---\n\n${params.content}`;
+
+  await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', md, 'text/markdown');
+  return { success: true, path, title: params.title, message: `Stored in memory: ${params.title}` };
+}
+
+async function memorySearch(params) {
+  const results = await obsidianApi('/search/simple/', 'POST', params.query, 'text/plain');
+  // Filter to memory folder
+  const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+  const filtered = (Array.isArray(results) ? results : []).filter(r =>
+    r.filename && r.filename.startsWith(folder)
+  ).slice(0, 10);
+
+  return {
+    success: true,
+    query: params.query,
+    count: filtered.length,
+    results: filtered.map(r => ({
+      path: r.filename,
+      matches: r.matches ? r.matches.map(m => ({
+        context: (m.match || '').substring(0, 200)
+      })).slice(0, 3) : []
+    }))
+  };
+}
+
+async function memoryRead(params) {
+  const data = await obsidianApi(`/vault/${encodeURIComponent(params.path)}`, 'GET');
+  return { success: true, path: params.path, content: (data.content || '').substring(0, 5000) };
+}
+
+async function memoryList() {
+  const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+  try {
+    const data = await obsidianApi(`/vault/${encodeURIComponent(folder)}/`, 'GET');
+    const files = (data.files || []).filter(f => f.endsWith('.md'));
+    return { success: true, folder, count: files.length, notes: files.map(f => f.replace(folder + '/', '').replace('.md', '')) };
+  } catch(e) {
+    return { success: true, folder, count: 0, notes: [], message: 'Memory folder empty or not yet created. It will be created when you first store a memory.' };
+  }
+}
+
+// Auto-save conversation summary to Obsidian after significant interactions
+async function autoSaveMemory(userMsg, fridayResponse, toolsUsed) {
+  if (!settings.obsidianKey || !settings.obsidianUrl) return;
+  // Only save for meaningful interactions (tool use or long conversations)
+  if (toolsUsed.length === 0 && fridayResponse.length < 200) return;
+
+  try {
+    const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const path = `${folder}/Sessions/${dateStr}-log.md`;
+
+    const entry = `\n\n---\n**${now.toLocaleTimeString()}** | Tools: ${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'none'}\n- **User:** ${userMsg.substring(0, 200)}\n- **FRIDAY:** ${fridayResponse.substring(0, 300)}`;
+
+    // Append to daily log
+    try {
+      const existing = await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'GET');
+      const updated = (existing.content || '') + entry;
+      await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', updated, 'text/markdown');
+    } catch(e) {
+      // File doesn't exist yet, create it
+      const header = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log — ${dateStr}\n`;
+      await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', header + entry, 'text/markdown');
+    }
+  } catch(e) {
+    console.log('Auto-save memory failed (non-critical):', e.message);
+  }
+}
+
+// ==================== WEB SEARCH (Brave) ====================
+async function webSearch(params) {
+  if (!settings.braveKey) throw new Error('Web search not configured. Add your Brave Search API key in Settings. Get one free at https://brave.com/search/api/');
+  const count = Math.min(params.count || 5, 10);
+  const r = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(params.query)}&count=${count}`, {
+    headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': settings.braveKey }
+  });
+  if (!r.ok) throw new Error('Brave Search error: ' + r.status);
+  const data = await r.json();
+  const results = (data.web?.results || []).map(r => ({
+    title: r.title,
+    url: r.url,
+    description: r.description || '',
+    age: r.age || ''
+  }));
+  return { success: true, query: params.query, count: results.length, results };
+}
+
+async function webRead(params) {
+  const maxLen = params.maxLength || 5000;
+  // Use allorigins CORS proxy to fetch any webpage
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(params.url)}`;
+  const r = await fetch(proxyUrl);
+  if (!r.ok) throw new Error('Failed to fetch URL: ' + r.status);
+  const html = await r.text();
+  // Strip HTML tags and extract readable text
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  // Remove script/style elements
+  tmp.querySelectorAll('script,style,nav,footer,header,iframe,noscript').forEach(el => el.remove());
+  let text = tmp.textContent || tmp.innerText || '';
+  // Clean up whitespace
+  text = text.replace(/\s+/g, ' ').replace(/\n\s*\n/g, '\n').trim();
+  return { success: true, url: params.url, length: text.length, content: text.substring(0, maxLen) };
+}
+
+// ==================== GMAIL API ====================
+async function gmailApi(endpoint, method = 'GET', body = null) {
+  if (!settings.gmailToken) throw new Error('Gmail not configured. Add your Gmail Access Token in Settings.');
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + settings.gmailToken,
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('https://www.googleapis.com/gmail/v1/users/me' + endpoint, opts);
+  if (!r.ok) {
+    const err = await r.text();
+    if (r.status === 401) throw new Error('Gmail token expired. Please refresh your token in Settings.');
+    throw new Error('Gmail API error: ' + err.substring(0, 200));
+  }
+  return r.json();
+}
+
+async function gmailList(params) {
+  const max = Math.min(params.maxResults || 10, 20);
+  const q = params.query || '';
+  const data = await gmailApi(`/messages?maxResults=${max}${q ? '&q=' + encodeURIComponent(q) : ''}`);
+  if (!data.messages || data.messages.length === 0) return { success: true, count: 0, emails: [] };
+
+  // Fetch headers for each message
+  const emails = [];
+  for (const msg of data.messages.slice(0, max)) {
+    try {
+      const detail = await gmailApi(`/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`);
+      const headers = detail.payload?.headers || [];
+      const getH = name => (headers.find(h => h.name.toLowerCase() === name.toLowerCase()) || {}).value || '';
+      emails.push({
+        id: msg.id,
+        threadId: msg.threadId,
+        from: getH('From'),
+        subject: getH('Subject'),
+        date: getH('Date'),
+        snippet: detail.snippet || '',
+        unread: (detail.labelIds || []).includes('UNREAD')
+      });
+    } catch(e) { /* skip failed messages */ }
+  }
+  return { success: true, count: emails.length, emails };
+}
+
+async function gmailRead(params) {
+  const data = await gmailApi(`/messages/${params.messageId}?format=full`);
+  const headers = data.payload?.headers || [];
+  const getH = name => (headers.find(h => h.name.toLowerCase() === name.toLowerCase()) || {}).value || '';
+
+  // Extract body
+  let body = '';
+  function extractBody(part) {
+    if (part.body?.data) {
+      body += atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+    }
+    if (part.parts) part.parts.forEach(extractBody);
+  }
+  extractBody(data.payload);
+
+  return {
+    success: true,
+    id: data.id,
+    from: getH('From'),
+    to: getH('To'),
+    subject: getH('Subject'),
+    date: getH('Date'),
+    body: body.substring(0, 3000),
+    labels: data.labelIds
+  };
+}
+
+async function gmailSend(params) {
+  const from = settings.gmailEmail || 'me';
+  let headers = `From: ${from}\r\nTo: ${params.to}\r\nSubject: ${params.subject}\r\nContent-Type: text/plain; charset=utf-8\r\n`;
+  if (params.cc) headers += `Cc: ${params.cc}\r\n`;
+  if (params.replyToMessageId) headers += `In-Reply-To: ${params.replyToMessageId}\r\nReferences: ${params.replyToMessageId}\r\n`;
+  const raw = btoa(unescape(encodeURIComponent(headers + '\r\n' + params.body)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+  const endpoint = params.replyToMessageId
+    ? `/messages/send`
+    : '/messages/send';
+  const data = await gmailApi(endpoint, 'POST', { raw });
+  return { success: true, messageId: data.id, threadId: data.threadId, to: params.to, subject: params.subject };
+}
+
+// ==================== OUTLOOK API (Microsoft Graph) ====================
+async function outlookApi(endpoint, method = 'GET', body = null) {
+  if (!settings.outlookToken) throw new Error('Outlook not configured. Add your Outlook Access Token in Settings.');
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + settings.outlookToken,
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('https://graph.microsoft.com/v1.0/me' + endpoint, opts);
+  if (!r.ok) {
+    const err = await r.text();
+    if (r.status === 401) throw new Error('Outlook token expired. Please refresh your token in Settings.');
+    throw new Error('Outlook API error: ' + err.substring(0, 200));
+  }
+  return r.json();
+}
+
+async function outlookList(params) {
+  const top = Math.min(params.maxResults || 10, 20);
+  let url = `/messages?$top=${top}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,isRead,bodyPreview`;
+  if (params.filter) url += `&$filter=${encodeURIComponent(params.filter)}`;
+  const data = await outlookApi(url);
+  const emails = (data.value || []).map(m => ({
+    id: m.id,
+    from: m.from?.emailAddress?.address || '',
+    fromName: m.from?.emailAddress?.name || '',
+    subject: m.subject || '',
+    date: m.receivedDateTime || '',
+    snippet: (m.bodyPreview || '').substring(0, 150),
+    unread: !m.isRead
+  }));
+  return { success: true, count: emails.length, emails };
+}
+
+async function outlookRead(params) {
+  const m = await outlookApi(`/messages/${params.messageId}?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,isRead`);
+  return {
+    success: true,
+    id: m.id,
+    from: m.from?.emailAddress?.address || '',
+    to: (m.toRecipients || []).map(r => r.emailAddress?.address).join(', '),
+    cc: (m.ccRecipients || []).map(r => r.emailAddress?.address).join(', '),
+    subject: m.subject || '',
+    date: m.receivedDateTime || '',
+    body: (m.body?.content || '').replace(/<[^>]*>/g, '').substring(0, 3000)
+  };
+}
+
+async function outlookSend(params) {
+  const toRecipients = params.to.split(',').map(e => ({
+    emailAddress: { address: e.trim() }
+  }));
+  const msg = {
+    message: {
+      subject: params.subject,
+      body: { contentType: 'Text', content: params.body },
+      toRecipients
+    }
+  };
+  if (params.cc) {
+    msg.message.ccRecipients = params.cc.split(',').map(e => ({
+      emailAddress: { address: e.trim() }
+    }));
+  }
+  await outlookApi('/sendMail', 'POST', msg);
+  return { success: true, to: params.to, subject: params.subject, message: 'Email sent via Outlook' };
+}
+
+// ==================== NOTIFICATION SYSTEM ====================
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const perm = await Notification.requestPermission();
+  return perm === 'granted';
+}
+
+function showNotification(title, body, tag) {
+  if (Notification.permission !== 'granted') return;
+  const n = new Notification(title, {
+    body: body,
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%230a0e17" stroke="%2300f0ff" stroke-width="3"/><text x="50" y="58" text-anchor="middle" font-size="24" fill="%2300f0ff" font-family="sans-serif">F</text></svg>',
+    tag: tag || 'friday-' + Date.now(),
+    requireInteraction: false
+  });
+  n.onclick = () => { window.focus(); n.close(); };
+  setTimeout(() => n.close(), 15000);
+}
+
+async function checkImportantTasks(params = {}) {
+  if (!settings.asanaPat) return { success: false, error: 'Asana not configured' };
+
+  const includeToday = params.includeToday !== false;
+  const fields = 'name,completed,due_on,assignee.name';
+  const tasks = await asanaApi(`/projects/${settings.asanaProjectGid}/tasks?completed_since=now&opt_fields=${fields}`);
+  const incomplete = tasks.filter(t => !t.completed);
+
+  const today = new Date().toISOString().split('T')[0];
+  const overdue = [];
+  const dueToday = [];
+  const upcoming = [];
+
+  for (const t of incomplete) {
+    if (!t.due_on) continue;
+    if (t.due_on < today) {
+      overdue.push(t);
+    } else if (t.due_on === today && includeToday) {
+      dueToday.push(t);
+    } else if (t.due_on <= new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]) {
+      upcoming.push(t);
+    }
+  }
+
+  // Send browser notifications for overdue and due today
+  const hasPermission = await requestNotifPermission();
+  if (hasPermission) {
+    if (overdue.length > 0) {
+      showNotification(
+        `⚠️ ${overdue.length} Overdue Task${overdue.length > 1 ? 's' : ''}`,
+        overdue.map(t => `• ${t.name} (due ${t.due_on})`).join('\n'),
+        'friday-overdue'
+      );
+    }
+    if (dueToday.length > 0) {
+      showNotification(
+        `📋 ${dueToday.length} Task${dueToday.length > 1 ? 's' : ''} Due Today`,
+        dueToday.map(t => `• ${t.name}`).join('\n'),
+        'friday-today'
+      );
+    }
+  }
+
+  // Also post to chat if called manually
+  return {
+    success: true,
+    overdue: overdue.map(t => ({ gid: t.gid, name: t.name, due_on: t.due_on })),
+    dueToday: dueToday.map(t => ({ gid: t.gid, name: t.name, due_on: t.due_on })),
+    upcoming: upcoming.map(t => ({ gid: t.gid, name: t.name, due_on: t.due_on })),
+    notificationsEnabled: hasPermission,
+    summary: `${overdue.length} overdue, ${dueToday.length} due today, ${upcoming.length} due within 3 days`
+  };
+}
+
+function startNotificationLoop() {
+  if (notifTimer) clearInterval(notifTimer);
+  if (settings.notifEnabled !== 'on' || !settings.asanaPat) return;
+
+  const intervalMs = (settings.notifInterval || 30) * 60000;
+
+  // Run initial check after 10 seconds
+  setTimeout(async () => {
+    try {
+      const result = await checkImportantTasks({ includeToday: true });
+      if (result.overdue?.length > 0 || result.dueToday?.length > 0) {
+        addMsg('friday', `🔔 Task check: ${result.summary}`);
+      }
+      lastNotifCheck = Date.now();
+    } catch(e) { console.error('Notification check failed:', e); }
+  }, 10000);
+
+  // Then repeat on interval
+  notifTimer = setInterval(async () => {
+    try {
+      const result = await checkImportantTasks({ includeToday: true });
+      if (result.overdue?.length > 0 || result.dueToday?.length > 0) {
+        addMsg('friday', `🔔 Task alert: ${result.summary}`);
+      }
+      lastNotifCheck = Date.now();
+    } catch(e) { console.error('Notification check failed:', e); }
+  }, intervalMs);
+}
+
 async function executeAction(name, params) {
   // Route Asana tools
   if (name === 'create_asana_task') return asanaCreateTask(params);
   if (name === 'list_asana_tasks') return asanaListTasks(params);
   if (name === 'update_asana_task') return asanaUpdateTask(params);
   if (name === 'search_asana_tasks') return asanaSearchTasks(params);
+
+  // Route Obsidian memory tools
+  if (name === 'memory_store') return memoryStore(params);
+  if (name === 'memory_search') return memorySearch(params);
+  if (name === 'memory_read') return memoryRead(params);
+  if (name === 'memory_list') return memoryList();
+
+  // Route Web tools
+  if (name === 'web_search') return webSearch(params);
+  if (name === 'web_read') return webRead(params);
+
+  // Route Gmail tools
+  if (name === 'list_gmail') return gmailList(params);
+  if (name === 'read_gmail') return gmailRead(params);
+  if (name === 'send_gmail') return gmailSend(params);
+
+  // Route Outlook tools
+  if (name === 'list_outlook') return outlookList(params);
+  if (name === 'read_outlook') return outlookRead(params);
+  if (name === 'send_outlook') return outlookSend(params);
+
+  // Route Notification tools
+  if (name === 'check_important_tasks') return checkImportantTasks(params);
 
   // Command Center tools
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
@@ -579,6 +1373,44 @@ function updatePanels(ccOnline) {
     voiceEl.textContent = 'ELEVENLABS'; voiceEl.className = 'stat-val green';
   } else {
     voiceEl.textContent = 'OFF'; voiceEl.className = 'stat-val red';
+  }
+
+  // Obsidian status
+  const obsEl = document.getElementById('obsidian-status');
+  if (settings.obsidianKey) {
+    obsEl.textContent = 'ONLINE'; obsEl.className = 'stat-val green';
+  } else {
+    obsEl.textContent = 'OFFLINE'; obsEl.className = 'stat-val red';
+  }
+
+  // Web Search status
+  const webEl = document.getElementById('web-status');
+  if (settings.braveKey) {
+    webEl.textContent = 'ONLINE'; webEl.className = 'stat-val green';
+  } else {
+    webEl.textContent = 'OFFLINE'; webEl.className = 'stat-val red';
+  }
+
+  // Gmail status
+  const gmailEl = document.getElementById('gmail-status');
+  const dotGmail = document.getElementById('dot-gmail');
+  if (settings.gmailToken) {
+    gmailEl.textContent = 'ONLINE'; gmailEl.className = 'stat-val green';
+    dotGmail.className = 'dot online';
+  } else {
+    gmailEl.textContent = 'OFFLINE'; gmailEl.className = 'stat-val red';
+    dotGmail.className = 'dot';
+  }
+
+  // Outlook status
+  const outlookEl = document.getElementById('outlook-status');
+  const dotOutlook = document.getElementById('dot-outlook');
+  if (settings.outlookToken) {
+    outlookEl.textContent = 'ONLINE'; outlookEl.className = 'stat-val green';
+    dotOutlook.className = 'dot online';
+  } else {
+    outlookEl.textContent = 'OFFLINE'; outlookEl.className = 'stat-val red';
+    dotOutlook.className = 'dot';
   }
 
   // Pipeline
@@ -717,6 +1549,8 @@ async function speak(text) {
     if (r.ok) {
       const blob = await r.blob();
       const audio = new Audio(URL.createObjectURL(blob));
+      orbState = 'speaking';
+      audio.onended = () => { orbState = 'idle'; };
       audio.play();
     }
   } catch(e) { console.error('TTS error:', e); }
@@ -796,20 +1630,26 @@ async function sendMessage() {
   typingDiv.id = 'typing';
   document.getElementById('chat').appendChild(typingDiv);
 
+  orbState = 'thinking';
   const result = await callClaude(msg);
 
   // Remove typing
   const t = document.getElementById('typing');
   if (t) t.remove();
 
+  orbState = 'speaking';
   addMsg('friday', result.text, result.tools);
   speak(result.text);
+  setTimeout(() => { orbState = 'idle'; }, 4000);
 
   // Save to DB
   if (db) {
     const tx = db.transaction('history', 'readwrite');
     tx.objectStore('history').add({ user: msg, friday: result.text, tools: result.tools, time: Date.now() });
   }
+
+  // Auto-save to Obsidian memory
+  autoSaveMemory(msg, result.text, result.tools || []);
 }
 
 function openSettings() { document.getElementById('settings-overlay').classList.add('open'); }
@@ -855,6 +1695,10 @@ async function init() {
   // Fetch data
   await refreshData();
 
+  // Start notification loop
+  requestNotifPermission();
+  startNotificationLoop();
+
   // Greeting
   const hour = new Date().getHours();
   let greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -864,8 +1708,11 @@ async function init() {
   } else {
     const leadCount = leadsData.length;
     const newCount = leadsData.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
-    const asanaMsg = settings.asanaPat ? ' Asana task management is live.' : '';
-    addMsg('friday', `${greeting}, Sir. All systems operational. I'm connected to Claude, Command Center, and task ops.${asanaMsg} ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
+    const asanaMsg = settings.asanaPat ? ' Asana is live.' : '';
+    const gmailMsg = settings.gmailToken ? ' Gmail connected.' : '';
+    const outlookMsg = settings.outlookToken ? ' Outlook connected.' : '';
+    const notifMsg = settings.notifEnabled === 'on' && settings.asanaPat ? ' Task notifications active.' : '';
+    addMsg('friday', `${greeting}, Sir. All systems operational.${asanaMsg}${gmailMsg}${outlookMsg}${notifMsg} ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
     speak(`${greeting}, Sir. All systems operational. ${leadCount} leads in pipeline. What are we working on?`);
   }
 }
