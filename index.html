@@ -234,6 +234,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <input type="number" id="set-notif-interval" placeholder="30" min="5" max="1440">
     </div>
     <button class="settings-save" onclick="saveSettings()">SAVE CONFIGURATION</button>
+    <div id="autosave-indicator" style="text-align:center;font-size:10px;color:var(--green);margin-top:8px;opacity:0;transition:opacity .3s;font-family:'Orbitron',sans-serif;letter-spacing:1px">AUTO-SAVED ✓</div>
   </div>
 </div>
 
@@ -760,7 +761,14 @@ async function dbCount(store) {
 }
 
 async function loadSettings() {
-  const saved = await dbGet('settings', 'config');
+  let saved = await dbGet('settings', 'config');
+  // Fallback: try localStorage backup if IndexedDB is empty
+  if (!saved) {
+    try {
+      const backup = localStorage.getItem('FRIDAY_SETTINGS_BACKUP');
+      if (backup) saved = JSON.parse(backup);
+    } catch(e) {}
+  }
   if (saved) settings = { ...settings, ...saved };
   document.getElementById('set-api-key').value = settings.apiKey || '';
   document.getElementById('set-cc-url').value = settings.ccUrl || '';
@@ -805,6 +813,47 @@ async function saveSettings() {
   startNotificationLoop();
   addMsg('friday', 'Settings saved, Sir. Reconnecting systems...');
   setTimeout(init, 500);
+}
+
+// ==================== AUTO-SAVE SETTINGS ====================
+let autoSaveTimer = null;
+function autoSaveSettings() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    settings.apiKey = document.getElementById('set-api-key').value.trim();
+    settings.ccUrl = document.getElementById('set-cc-url').value.trim();
+    settings.elevenKey = document.getElementById('set-eleven-key').value.trim();
+    settings.voiceId = document.getElementById('set-voice-id').value.trim();
+    settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
+    settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
+    settings.model = document.getElementById('set-model').value;
+    settings.braveKey = document.getElementById('set-brave-key').value.trim();
+    settings.obsidianUrl = document.getElementById('set-obsidian-url').value.trim() || 'https://127.0.0.1:27124';
+    settings.obsidianKey = document.getElementById('set-obsidian-key').value.trim();
+    settings.obsidianFolder = document.getElementById('set-obsidian-folder').value.trim() || 'FRIDAY/Memory';
+    settings.gmailToken = document.getElementById('set-gmail-token').value.trim();
+    settings.gmailEmail = document.getElementById('set-gmail-email').value.trim();
+    settings.outlookToken = document.getElementById('set-outlook-token').value.trim();
+    settings.outlookEmail = document.getElementById('set-outlook-email').value.trim();
+    settings.notifEnabled = document.getElementById('set-notif-enabled').value;
+    settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
+    await dbPut('settings', 'config', settings);
+    // Also save to localStorage as backup
+    try { localStorage.setItem('FRIDAY_SETTINGS_BACKUP', JSON.stringify(settings)); } catch(e) {}
+    const ind = document.getElementById('autosave-indicator');
+    if (ind) { ind.style.opacity = '1'; setTimeout(() => ind.style.opacity = '0', 1500); }
+  }, 800); // 800ms debounce
+}
+
+function initAutoSave() {
+  const ids = ['set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', autoSaveSettings);
+      el.addEventListener('change', autoSaveSettings);
+    }
+  });
 }
 
 // ==================== COMMAND CENTER ====================
@@ -1676,6 +1725,7 @@ function updateClock() {
 async function init() {
   await openDB();
   await loadSettings();
+  initAutoSave();
 
   // Count sessions
   sessionCount = await dbCount('sessions');
