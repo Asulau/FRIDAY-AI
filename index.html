@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F.R.I.D.A.Y. â Personal AI Assistant</title>
+<title>F.R.I.D.A.Y. Ã¢ÂÂ Personal AI Assistant</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 @font-face{font-family:'Orbitron';src:url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap')}
@@ -153,14 +153,14 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="setting-group">
       <label>AI PROVIDER</label>
       <select id="set-provider" onchange="toggleProviderFields()">
-        <option value="groq">Groq â Llama 3.3 (TRULY FREE â)</option>
+        <option value="groq">Groq Ã¢ÂÂ Llama 3.3 (TRULY FREE Ã¢ÂÂ)</option>
         <option value="gemini">Google Gemini (Free tier)</option>
         <option value="anthropic">Anthropic Claude (Paid)</option>
       </select>
     </div>
     <!-- Groq -->
     <div class="setting-group" id="group-groq-key">
-      <label>GROQ API KEY <span style="color:var(--green);font-size:9px">(FREE â get at console.groq.com)</span></label>
+      <label>GROQ API KEY <span style="color:var(--green);font-size:9px">(FREE Ã¢ÂÂ get at console.groq.com)</span></label>
       <input type="password" id="set-groq-key" placeholder="gsk_...">
     </div>
     <div class="setting-group" id="group-groq-model">
@@ -490,7 +490,7 @@ const TOOLS = [
   },
   {
     name: 'update_asana_task',
-    description: 'Update an existing Asana task â mark complete, change due date, rename, add notes.',
+    description: 'Update an existing Asana task Ã¢ÂÂ mark complete, change due date, rename, add notes.',
     input_schema: {
       type: 'object',
       properties: {
@@ -680,7 +680,7 @@ function buildSystemPrompt() {
   const byStatus = {};
   leadsData.forEach(l => { const s=(l.status||'NEW').toUpperCase(); byStatus[s]=(byStatus[s]||0)+1; });
 
-  // Groq has strict token limits â use compact prompt
+  // Groq has strict token limits Ã¢ÂÂ use compact prompt
   if (settings.provider === 'groq') {
     return `You are FRIDAY, Laurence's AI assistant. Warm, direct, British. Act don't describe. Chain tools (up to 12 per response). 1-3 sentence replies max. No filler words.
 
@@ -695,7 +695,7 @@ Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, cr
   const recentLeads = leadsData.slice(0, 5).map(l => ({
     name: (l.firstName||l.name||'')+' '+(l.lastName||''), company: l.company||'', status: l.status||''
   }));
-  return `You are FRIDAY â Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
+  return `You are FRIDAY Ã¢ÂÂ Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
 
 Pipeline: ${totalLeads} leads | ${JSON.stringify(byStatus)}
 Recent: ${JSON.stringify(recentLeads)}
@@ -803,7 +803,7 @@ async function saveSettings() {
   startNotificationLoop();
   toggleProviderFields();
   addMsg('friday', 'Settings saved.');
-  // Don't call init() â it re-runs loadSettings() which can cause race conditions
+  // Don't call init() Ã¢ÂÂ it re-runs loadSettings() which can cause race conditions
 }
 
 // ==================== AUTO-SAVE SETTINGS ====================
@@ -853,13 +853,13 @@ function autoSaveSettings() {
     readSettingsFromDOM();
     persistSettings();
     const ind = document.getElementById('autosave-indicator');
-    if (ind) { ind.textContent = 'SAVED â ' + new Date().toLocaleTimeString(); }
+    if (ind) { ind.textContent = 'SAVED Ã¢ÂÂ ' + new Date().toLocaleTimeString(); }
   }, 500);
 }
 
 let _autoSaveInitialized = false;
 function initAutoSave() {
-  if (_autoSaveInitialized) return; // Only run once â prevents stacking listeners on re-init
+  if (_autoSaveInitialized) return; // Only run once Ã¢ÂÂ prevents stacking listeners on re-init
   _autoSaveInitialized = true;
   const ids = ['set-provider','set-groq-key','set-groq-model','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
   ids.forEach(id => {
@@ -960,7 +960,7 @@ async function asanaSearchTasks(params) {
 
 // ==================== OBSIDIAN MEMORY BANK ====================
 async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
-  if (!settings.obsidianKey) throw new Error('Obsidian not configured â add your API key in Settings.');
+  if (!settings.obsidianKey) throw new Error('Obsidian not configured Ã¢ÂÂ add your API key in Settings.');
   const opts = {
     method,
     headers: {
@@ -1079,7 +1079,7 @@ async function autoSaveMemory(userMsg, fridayResponse, toolsUsed) {
       await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', updated, 'text/markdown');
     } catch(e) {
       // File doesn't exist yet, create it
-      const header = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log â ${dateStr}\n`;
+      const header = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log Ã¢ÂÂ ${dateStr}\n`;
       await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', header + entry, 'text/markdown');
     }
   } catch(e) {
@@ -1333,15 +1333,15 @@ async function checkImportantTasks(params = {}) {
   if (hasPermission) {
     if (overdue.length > 0) {
       showNotification(
-        `â ï¸ ${overdue.length} Overdue Task${overdue.length > 1 ? 's' : ''}`,
-        overdue.map(t => `â¢ ${t.name} (due ${t.due_on})`).join('\n'),
+        `Ã¢ÂÂ Ã¯Â¸Â ${overdue.length} Overdue Task${overdue.length > 1 ? 's' : ''}`,
+        overdue.map(t => `Ã¢ÂÂ¢ ${t.name} (due ${t.due_on})`).join('\n'),
         'friday-overdue'
       );
     }
     if (dueToday.length > 0) {
       showNotification(
-        `ð ${dueToday.length} Task${dueToday.length > 1 ? 's' : ''} Due Today`,
-        dueToday.map(t => `â¢ ${t.name}`).join('\n'),
+        `Ã°ÂÂÂ ${dueToday.length} Task${dueToday.length > 1 ? 's' : ''} Due Today`,
+        dueToday.map(t => `Ã¢ÂÂ¢ ${t.name}`).join('\n'),
         'friday-today'
       );
     }
@@ -1369,7 +1369,7 @@ function startNotificationLoop() {
     try {
       const result = await checkImportantTasks({ includeToday: true });
       if (result.overdue?.length > 0 || result.dueToday?.length > 0) {
-        addMsg('friday', `ð Task check: ${result.summary}`);
+        addMsg('friday', `Ã°ÂÂÂ Task check: ${result.summary}`);
       }
       lastNotifCheck = Date.now();
     } catch(e) { console.error('Notification check failed:', e); }
@@ -1380,7 +1380,7 @@ function startNotificationLoop() {
     try {
       const result = await checkImportantTasks({ includeToday: true });
       if (result.overdue?.length > 0 || result.dueToday?.length > 0) {
-        addMsg('friday', `ð Task alert: ${result.summary}`);
+        addMsg('friday', `Ã°ÂÂÂ Task alert: ${result.summary}`);
       }
       lastNotifCheck = Date.now();
     } catch(e) { console.error('Notification check failed:', e); }
@@ -1579,11 +1579,11 @@ async function callClaude(userMessage) {
   const activeKey = getActiveKey();
   if (!activeKey) {
     const hints = {
-      groq: 'Get a free key at console.groq.com â no credit card needed.',
+      groq: 'Get a free key at console.groq.com Ã¢ÂÂ no credit card needed.',
       gemini: 'Get a key at aistudio.google.com/apikey',
       anthropic: 'Get a key at console.anthropic.com/settings/keys'
     };
-    return { text: `No API key set, Sir. Open Settings (â) and enter your key. ${hints[settings.provider] || ''}`, tools: [] };
+    return { text: `No API key set, Sir. Open Settings (Ã¢ÂÂ) and enter your key. ${hints[settings.provider] || ''}`, tools: [] };
   }
   if (settings.provider === 'groq') return callGroq(userMessage);
   if (settings.provider === 'gemini') return callGemini(userMessage);
@@ -1902,10 +1902,20 @@ async function callAnthropic(userMessage) {
 }
 
 // ==================== VOICE (ElevenLabs) ====================
+let _audioUnlocked = false;
+let _pendingAudio = null;
+function unlockAudio() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  if (_pendingAudio) { _pendingAudio.play().catch(()=>{}); _pendingAudio = null; }
+}
+['click','touchstart','keydown'].forEach(e => document.addEventListener(e, unlockAudio, { once: true }));
+
 async function speak(text) {
   if (!settings.elevenKey || !settings.voiceId) return;
   try {
-    const cleanText = text.replace(/[*_`#]/g, '').substring(0, 1000);
+    const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
+    if (!cleanText) return;
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
@@ -1917,10 +1927,20 @@ async function speak(text) {
     });
     if (r.ok) {
       const blob = await r.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
       orbState = 'speaking';
-      audio.onended = () => { orbState = 'idle'; };
-      audio.play();
+      audio.onended = () => { orbState = 'idle'; URL.revokeObjectURL(url); };
+      const pp = audio.play();
+      if (pp) pp.catch(err => {
+        if (err.name === 'NotAllowedError') {
+          _pendingAudio = audio;
+          _audioUnlocked = false;
+          ['click','touchstart','keydown'].forEach(e => document.addEventListener(e, unlockAudio, { once: true }));
+        }
+      });
+    } else {
+      console.error('ElevenLabs error:', r.status, await r.text().then(t=>t.substring(0,200)));
     }
   } catch(e) { console.error('TTS error:', e); }
 }
@@ -1939,8 +1959,8 @@ async function startRecording() {
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      // For now, show a message â STT would need Whisper API
-      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon â please type for now.');
+      // For now, show a message Ã¢ÂÂ STT would need Whisper API
+      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon Ã¢ÂÂ please type for now.');
     };
     mediaRecorder.start();
     isRecording = true;
@@ -1968,12 +1988,12 @@ function addMsg(type, text, tools) {
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
 
   let label = type === 'friday' ? 'F.R.I.D.A.Y.' : 'YOU';
-  let html = `<div class="msg-label">${label} â ${timeStr}</div>`;
+  let html = `<div class="msg-label">${label} Ã¢ÂÂ ${timeStr}</div>`;
   html += text.replace(/\n/g, '<br>');
 
   if (tools && tools.length > 0) {
     html += '<div style="margin-top:8px">';
-    tools.forEach(t => { html += `<span class="tool-badge">â¡ ${t}</span>`; });
+    tools.forEach(t => { html += `<span class="tool-badge">Ã¢ÂÂ¡ ${t}</span>`; });
     html += '</div>';
   }
 
@@ -2090,7 +2110,7 @@ async function loadLastSession() {
     });
     if (msgs.length > 0) {
       lastSessionSummary = msgs.reverse().map(m =>
-        `User: ${(m.user || '').substring(0, 100)} â FRIDAY: ${(m.friday || '').substring(0, 150)}`
+        `User: ${(m.user || '').substring(0, 100)} Ã¢ÂÂ FRIDAY: ${(m.friday || '').substring(0, 150)}`
       ).join('\n');
     }
   } catch(e) { /* non-critical */ }
@@ -2104,7 +2124,7 @@ async function proactiveBriefing() {
   if (!hasIntegrations) return;
 
   // Build a proactive prompt
-  const briefingPrompt = `Give me a quick morning briefing. Check what's important right now â tasks due today, any urgent emails, pipeline status. Keep it to 3-4 lines max. Be direct.`;
+  const briefingPrompt = `Give me a quick morning briefing. Check what's important right now Ã¢ÂÂ tasks due today, any urgent emails, pipeline status. Keep it to 3-4 lines max. Be direct.`;
 
   orbState = 'thinking';
   const typingDiv = document.createElement('div');
@@ -2162,7 +2182,7 @@ async function init() {
   toggleProviderFields();
 
   if (!getActiveKey()) {
-    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (â) and enter your API key â Gemini is free at aistudio.google.com/apikey`);
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (Ã¢ÂÂ) and enter your API key Ã¢ÂÂ Gemini is free at aistudio.google.com/apikey`);
   } else {
     addMsg('friday', `${greeting}, Sir. Systems online. Scanning what needs your attention...`);
     speak(`${greeting}, Sir. Systems online.`);
@@ -2177,9 +2197,9 @@ async function init() {
       const tasks = await asanaApi('/tasks?project=' + settings.asanaProjectGid + '&opt_fields=name,due_on,completed&completed_since=now');
       const overdue = (tasks.data || []).filter(t => t.due_on && new Date(t.due_on) < new Date() && !t.completed);
       if (overdue.length > 0 && Notification.permission === 'granted') {
-        new Notification('FRIDAY â Heads Up', {
+        new Notification('FRIDAY Ã¢ÂÂ Heads Up', {
           body: `${overdue.length} overdue task${overdue.length > 1 ? 's' : ''} need attention`,
-          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">ð¤</text></svg>'
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">Ã°ÂÂ¤Â</text></svg>'
         });
       }
     } catch(e) { /* silent */ }
