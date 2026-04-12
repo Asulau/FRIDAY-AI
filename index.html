@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F.R.I.D.A.Y. ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Personal AI Assistant</title>
+<title>F.R.I.D.A.Y. — Personal AI Assistant</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 @font-face{font-family:'Orbitron';src:url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap')}
@@ -153,14 +153,14 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="setting-group">
       <label>AI PROVIDER</label>
       <select id="set-provider" onchange="toggleProviderFields()">
-        <option value="groq">Groq ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Llama 3.3 (TRULY FREE ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ)</option>
+        <option value="groq">Groq — Llama 3.3 (TRULY FREE ✓)</option>
         <option value="gemini">Google Gemini (Free tier)</option>
         <option value="anthropic">Anthropic Claude (Paid)</option>
       </select>
     </div>
     <!-- Groq -->
     <div class="setting-group" id="group-groq-key">
-      <label>GROQ API KEY <span style="color:var(--green);font-size:9px">(FREE ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ get at console.groq.com)</span></label>
+      <label>GROQ API KEY <span style="color:var(--green);font-size:9px">(FREE — get at console.groq.com)</span></label>
       <input type="password" id="set-groq-key" placeholder="gsk_...">
     </div>
     <div class="setting-group" id="group-groq-model">
@@ -220,9 +220,8 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <hr style="border-color:var(--border);margin:16px 0">
     <h2 style="font-size:12px;margin-bottom:12px">WEB SEARCH</h2>
     <div class="setting-group">
-      <label style="color:var(--green)">DUCKDUCKGO (FREE - no key needed)</label>
-      <input type="hidden" id="set-brave-key" value="">
-      <p style="font-size:10px;color:#888;margin-top:4px">Web search is always available at no cost.</p>
+      <label>WEB SEARCH</label>
+      <p style="font-size:11px;color:var(--text-dim);margin:4px 0">DuckDuckGo search is always available. No API key required.</p>
     </div>
     <hr style="border-color:var(--border);margin:16px 0">
     <h2 style="font-size:12px;margin-bottom:12px">OBSIDIAN MEMORY BANK</h2>
@@ -276,11 +275,11 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 
 <script>
 // ==================== STATE ====================
-const DB_NAME = 'FRIDAY_DB';
+const DH_NAME = 'FRIDY_DB';
 const DB_VERSION = 2;
 let db = null;
 let settings = {
-  provider: 'groq',
+  provider: 'anthropic',
   apiKey: '',
   geminiKey: '',
   geminiModel: 'gemini-2.0-flash',
@@ -491,7 +490,7 @@ const TOOLS = [
   },
   {
     name: 'update_asana_task',
-    description: 'Update an existing Asana task ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ mark complete, change due date, rename, add notes.',
+    description: 'Update an existing Asana task — mark complete, change due date, rename, add notes.',
     input_schema: {
       type: 'object',
       properties: {
@@ -593,7 +592,7 @@ const TOOLS = [
   // Web tools
   {
     name: 'web_search',
-    description: 'Search the web using DuckDuckGo (free, no key needed). Use when asked to look something up, research a topic, find information online, or check current events.',
+    description: 'Search the web using DuckDuckGo. Use when asked to look something up, research a topic, find information online, or check current events.',
     input_schema: {
       type: 'object',
       properties: {
@@ -681,12 +680,12 @@ function buildSystemPrompt() {
   const byStatus = {};
   leadsData.forEach(l => { const s=(l.status||'NEW').toUpperCase(); byStatus[s]=(byStatus[s]||0)+1; });
 
-  // Groq has strict token limits ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ use compact prompt
+  // Groq has strict token limits — use compact prompt
   if (settings.provider === 'groq') {
     return `You are FRIDAY, Laurence's AI assistant. Warm, direct, British. Act don't describe. Chain tools (up to 12 per response). 1-3 sentence replies max. No filler words.
 
 Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v).join(', ')}
-Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
+Asana:${settings.asanaPat?'ON':'OFF'} Web:ON Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks`;
@@ -696,11 +695,11 @@ Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, cr
   const recentLeads = leadsData.slice(0, 5).map(l => ({
     name: (l.firstName||l.name||'')+' '+(l.lastName||''), company: l.company||'', status: l.status||''
   }));
-  return `You are FRIDAY ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
+  return `You are FRIDAY — Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
 
 Pipeline: ${totalLeads} leads | ${JSON.stringify(byStatus)}
 Recent: ${JSON.stringify(recentLeads)}
-Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Memory:${settings.obsidianKey?'LIVE ('+settings.obsidianFolder+')':'OFF'} Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
+Asana:${settings.asanaPat?'LIVE':'OFF'} Web:LIVE Memory:${settings.obsidianKey?'LIVE ('+settings.obsidianFolder+')':'OFF'} Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
@@ -784,7 +783,7 @@ async function loadSettings() {
   document.getElementById('set-asana-pat').value = settings.asanaPat || '';
   document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
-  document.getElementById('set-brave-key').value = settings.braveKey || '';
+  // set-brave-key removed (DuckDuckGo needs no key)
   document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'http://127.0.0.1:27123';
   document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
   document.getElementById('set-obsidian-folder').value = settings.obsidianFolder || 'FRIDAY/Memory';
@@ -804,7 +803,7 @@ async function saveSettings() {
   startNotificationLoop();
   toggleProviderFields();
   addMsg('friday', 'Settings saved.');
-  // Don't call init() ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ it re-runs loadSettings() which can cause race conditions
+  // Don't call init() — it re-runs loadSettings() which can cause race conditions
 }
 
 // ==================== AUTO-SAVE SETTINGS ====================
@@ -823,7 +822,7 @@ function readSettingsFromDOM() {
   settings.asanaPat = (document.getElementById('set-asana-pat').value || '').trim();
   settings.asanaProjectGid = (document.getElementById('set-asana-project').value || '').trim() || '1213654696710519';
   settings.model = document.getElementById('set-model').value;
-  settings.braveKey = (document.getElementById('set-brave-key').value || '').trim();
+  settings.braveKey = ''; // DuckDuckGo needs no key
   settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'http://127.0.0.1:27123';
   settings.obsidianKey = (document.getElementById('set-obsidian-key').value || '').trim();
   settings.obsidianFolder = (document.getElementById('set-obsidian-folder').value || '').trim() || 'FRIDAY/Memory';
@@ -854,13 +853,13 @@ function autoSaveSettings() {
     readSettingsFromDOM();
     persistSettings();
     const ind = document.getElementById('autosave-indicator');
-    if (ind) { ind.textContent = 'SAVED ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ' + new Date().toLocaleTimeString(); }
+    if (ind) { ind.textContent = 'SAVED ✓ ' + new Date().toLocaleTimeString(); }
   }, 500);
 }
 
 let _autoSaveInitialized = false;
 function initAutoSave() {
-  if (_autoSaveInitialized) return; // Only run once ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ prevents stacking listeners on re-init
+  if (_autoSaveInitialized) return; // Only run once — prevents stacking listeners on re-init
   _autoSaveInitialized = true;
   const ids = ['set-provider','set-groq-key','set-groq-model','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
   ids.forEach(id => {
@@ -874,11 +873,6 @@ function initAutoSave() {
   window.addEventListener('beforeunload', () => {
     readSettingsFromDOM();
     try { localStorage.setItem('FRIDAY_SETTINGS', JSON.stringify(settings)); } catch(e) {}
-  });
-  // Persist immediately on select/checkbox change
-  ['set-provider','set-groq-model','set-gemini-model','set-notif-enabled'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => { readSettingsFromDOM(); persistSettings(); });
   });
 }
 
@@ -966,7 +960,7 @@ async function asanaSearchTasks(params) {
 
 // ==================== OBSIDIAN MEMORY BANK ====================
 async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
-  if (!settings.obsidianKey) throw new Error('Obsidian not configured ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ add your API key in Settings.');
+  if (!settings.obsidianKey) throw new Error('Obsidian not configured — add your API key in Settings.');
   const opts = {
     method,
     headers: {
@@ -1085,7 +1079,7 @@ async function autoSaveMemory(userMsg, fridayResponse, toolsUsed) {
       await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', updated, 'text/markdown');
     } catch(e) {
       // File doesn't exist yet, create it
-      const header = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ${dateStr}\n`;
+      const header = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log — ${dateStr}\n`;
       await obsidianApi(`/vault/${encodeURIComponent(path)}`, 'PUT', header + entry, 'text/markdown');
     }
   } catch(e) {
@@ -1093,7 +1087,7 @@ async function autoSaveMemory(userMsg, fridayResponse, toolsUsed) {
   }
 }
 
-// ==================== WEB SEARCH (DuckDuckGo - Free) ====================
+// ==================== WEB SEARCH (DuckDuckGo - no API key needed) ====================
 async function webSearch(params) {
   const count = Math.min(params.count || 6, 10);
   const query = params.query;
@@ -1104,20 +1098,15 @@ async function webSearch(params) {
     const html = await r.text();
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const resultEls = Array.from(doc.querySelectorAll('.result')).slice(0, count);
-    const results = resultEls.map(el => {
-      const titleEl = el.querySelector('.result__a');
-      const snippetEl = el.querySelector('.result__snippet');
-      const urlEl = el.querySelector('.result__url');
-      return {
-        title: titleEl ? titleEl.textContent.trim() : '',
-        url: urlEl ? 'https://' + urlEl.textContent.trim() : (titleEl ? titleEl.href : ''),
-        description: snippetEl ? snippetEl.textContent.trim() : ''
-      };
-    }).filter(r => r.title);
+    const results = Array.from(doc.querySelectorAll('.result')).slice(0, count).map(el => ({
+      title: el.querySelector('.result__a')?.textContent.trim() || '',
+      url: el.querySelector('.result__url') ? 'https://' + el.querySelector('.result__url').textContent.trim() : '',
+      description: el.querySelector('.result__snippet')?.textContent.trim() || ''
+    })).filter(r => r.title);
     if (results.length > 0) return { success: true, query, count: results.length, results };
-    throw new Error('no results parsed');
+    throw new Error('no results from HTML');
   } catch(e) {
+    // Fallback: DuckDuckGo Instant Answer API
     const r2 = await fetch('https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1');
     const data = await r2.json();
     const results = [];
@@ -1125,9 +1114,10 @@ async function webSearch(params) {
     (data.RelatedTopics || []).slice(0, count - results.length).forEach(t => {
       if (t.Text && t.FirstURL) results.push({ title: t.Text.substring(0, 80), url: t.FirstURL, description: t.Text });
     });
-    return { success: true, query, count: results.length, results, note: results.length === 0 ? 'no results' : 'instant answers' };
+    return { success: true, query, count: results.length, results };
   }
 }
+
 async function webRead(params) {
   const maxLen = params.maxLength || 5000;
   // Use allorigins CORS proxy to fetch any webpage
@@ -1356,15 +1346,15 @@ async function checkImportantTasks(params = {}) {
   if (hasPermission) {
     if (overdue.length > 0) {
       showNotification(
-        `ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂ¯ÃÂÃÂ¸ÃÂÃÂ ${overdue.length} Overdue Task${overdue.length > 1 ? 's' : ''}`,
-        overdue.map(t => `ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ¢ ${t.name} (due ${t.due_on})`).join('\n'),
+        `⚠️ ${overdue.length} Overdue Task${overdue.length > 1 ? 's' : ''}`,
+        overdue.map(t => `• ${t.name} (due ${t.due_on})`).join('\n'),
         'friday-overdue'
       );
     }
     if (dueToday.length > 0) {
       showNotification(
-        `ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ ${dueToday.length} Task${dueToday.length > 1 ? 's' : ''} Due Today`,
-        dueToday.map(t => `ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ¢ ${t.name}`).join('\n'),
+        `📋 ${dueToday.length} Task${dueToday.length > 1 ? 's' : ''} Due Today`,
+        dueToday.map(t => `• ${t.name}`).join('\n'),
         'friday-today'
       );
     }
@@ -1392,7 +1382,7 @@ function startNotificationLoop() {
     try {
       const result = await checkImportantTasks({ includeToday: true });
       if (result.overdue?.length > 0 || result.dueToday?.length > 0) {
-        addMsg('friday', `ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ Task check: ${result.summary}`);
+        addMsg('friday', `🔔 Task check: ${result.summary}`);
       }
       lastNotifCheck = Date.now();
     } catch(e) { console.error('Notification check failed:', e); }
@@ -1403,7 +1393,7 @@ function startNotificationLoop() {
     try {
       const result = await checkImportantTasks({ includeToday: true });
       if (result.overdue?.length > 0 || result.dueToday?.length > 0) {
-        addMsg('friday', `ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ Task alert: ${result.summary}`);
+        addMsg('friday', `🔔 Task alert: ${result.summary}`);
       }
       lastNotifCheck = Date.now();
     } catch(e) { console.error('Notification check failed:', e); }
@@ -1514,7 +1504,7 @@ function updatePanels(ccOnline) {
     obsEl.textContent = 'OFFLINE'; obsEl.className = 'stat-val red';
   }
 
-  // Web Search status (always online - DuckDuckGo free)
+  // Web Search status (DuckDuckGo - always available)
   const webEl = document.getElementById('web-status');
   webEl.textContent = 'ONLINE'; webEl.className = 'stat-val green';
 
@@ -1598,11 +1588,11 @@ async function callClaude(userMessage) {
   const activeKey = getActiveKey();
   if (!activeKey) {
     const hints = {
-      groq: 'Get a free key at console.groq.com ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ no credit card needed.',
+      groq: 'Get a free key at console.groq.com — no credit card needed.',
       gemini: 'Get a key at aistudio.google.com/apikey',
       anthropic: 'Get a key at console.anthropic.com/settings/keys'
     };
-    return { text: `No API key set, Sir. Open Settings (ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ) and enter your key. ${hints[settings.provider] || ''}`, tools: [] };
+    return { text: `No API key set, Sir. Open Settings (⚙) and enter your key. ${hints[settings.provider] || ''}`, tools: [] };
   }
   if (settings.provider === 'groq') return callGroq(userMessage);
   if (settings.provider === 'gemini') return callGemini(userMessage);
@@ -1645,22 +1635,27 @@ async function callGroq(userMessage) {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-8)], // Keep history short for Groq token limits
+        messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-8)],
         tools: toolsToOpenAI(),
         tool_choice: 'auto',
         parallel_tool_calls: false, // Llama 3.3 breaks with parallel tool calls (uses XML format instead of JSON)
-        max_tokens: 1024, // Keep responses concise to stay within TPM limits
+        max_tokens: 1024,
         temperature: 0.6
       })
     });
     if (!r.ok) {
       const errText = await r.text();
-      // If tool_use_failed, retry without tools (plain chat fallback)
+      // If tool_use_failed, retry without tools (fallback to plain chat)
       if (r.status === 400 && errText.includes('tool_use_failed')) {
         const fallback = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + settings.groqKey },
-          body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-8)], max_tokens: 1024, temperature: 0.6 })
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-8)],
+            max_tokens: 1024,
+            temperature: 0.6
+          })
         });
         if (fallback.ok) return fallback.json();
       }
@@ -1942,14 +1937,16 @@ async function speak(text) {
       headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
       body: JSON.stringify({ text: cleanText, model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
     });
-    if (!r.ok) { console.error('ElevenLabs', r.status, await r.text().then(t=>t.substring(0,200))); return; }
+    if (!r.ok) { console.error('ElevenLabs', r.status, await r.text().then(t => t.substring(0, 200))); return; }
     const buf = await r.arrayBuffer();
     const ctx = _getAudioCtx();
     await _unlockAudio();
     const decoded = await ctx.decodeAudioData(buf);
     const src = ctx.createBufferSource();
-    src.buffer = decoded; src.connect(ctx.destination);
-    orbState = 'speaking'; src.onended = () => { orbState = 'idle'; };
+    src.buffer = decoded;
+    src.connect(ctx.destination);
+    orbState = 'speaking';
+    src.onended = () => { orbState = 'idle'; };
     src.start(0);
   } catch(e) { console.error('TTS:', e); }
 }
@@ -1968,8 +1965,8 @@ async function startRecording() {
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      // For now, show a message ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ STT would need Whisper API
-      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ please type for now.');
+      // For now, show a message — STT would need Whisper API
+      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon — please type for now.');
     };
     mediaRecorder.start();
     isRecording = true;
@@ -1997,12 +1994,12 @@ function addMsg(type, text, tools) {
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
 
   let label = type === 'friday' ? 'F.R.I.D.A.Y.' : 'YOU';
-  let html = `<div class="msg-label">${label} ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ${timeStr}</div>`;
+  let html = `<div class="msg-label">${label} — ${timeStr}</div>`;
   html += text.replace(/\n/g, '<br>');
 
   if (tools && tools.length > 0) {
     html += '<div style="margin-top:8px">';
-    tools.forEach(t => { html += `<span class="tool-badge">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ¡ ${t}</span>`; });
+    tools.forEach(t => { html += `<span class="tool-badge">⚡ ${t}</span>`; });
     html += '</div>';
   }
 
@@ -2014,7 +2011,7 @@ function addMsg(type, text, tools) {
 }
 
 async function sendMessage() {
-  _unlockAudio();
+  _unlockAudio(); // unlock AudioContext on user gesture before async work
   const input = document.getElementById('input');
   const msg = input.value.trim();
   if (!msg) return;
@@ -2120,7 +2117,7 @@ async function loadLastSession() {
     });
     if (msgs.length > 0) {
       lastSessionSummary = msgs.reverse().map(m =>
-        `User: ${(m.user || '').substring(0, 100)} ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ FRIDAY: ${(m.friday || '').substring(0, 150)}`
+        `User: ${(m.user || '').substring(0, 100)} → FRIDAY: ${(m.friday || '').substring(0, 150)}`
       ).join('\n');
     }
   } catch(e) { /* non-critical */ }
@@ -2134,7 +2131,7 @@ async function proactiveBriefing() {
   if (!hasIntegrations) return;
 
   // Build a proactive prompt
-  const briefingPrompt = `Give me a quick morning briefing. Check what's important right now ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ tasks due today, any urgent emails, pipeline status. Keep it to 3-4 lines max. Be direct.`;
+  const briefingPrompt = `Give me a quick morning briefing. Check what's important right now — tasks due today, any urgent emails, pipeline status. Keep it to 3-4 lines max. Be direct.`;
 
   orbState = 'thinking';
   const typingDiv = document.createElement('div');
@@ -2192,7 +2189,7 @@ async function init() {
   toggleProviderFields();
 
   if (!getActiveKey()) {
-    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ) and enter your API key ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Gemini is free at aistudio.google.com/apikey`);
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your API key — Gemini is free at aistudio.google.com/apikey`);
   } else {
     addMsg('friday', `${greeting}, Sir. Systems online. Scanning what needs your attention...`);
     speak(`${greeting}, Sir. Systems online.`);
@@ -2207,9 +2204,9 @@ async function init() {
       const tasks = await asanaApi('/tasks?project=' + settings.asanaProjectGid + '&opt_fields=name,due_on,completed&completed_since=now');
       const overdue = (tasks.data || []).filter(t => t.due_on && new Date(t.due_on) < new Date() && !t.completed);
       if (overdue.length > 0 && Notification.permission === 'granted') {
-        new Notification('FRIDAY ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Heads Up', {
+        new Notification('FRIDAY — Heads Up', {
           body: `${overdue.length} overdue task${overdue.length > 1 ? 's' : ''} need attention`,
-          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">ÃÂÃÂ°ÃÂÃÂÃÂÃÂ¤ÃÂÃÂ</text></svg>'
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🤖</text></svg>'
         });
       }
     } catch(e) { /* silent */ }
