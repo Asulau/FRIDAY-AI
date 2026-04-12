@@ -269,7 +269,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <input type="number" id="set-notif-interval" placeholder="30" min="5" max="1440">
     </div>
     <button class="settings-save" onclick="saveSettings()">SAVE CONFIGURATION</button>
-    <div id="autosave-indicator" style="text-align:center;font-size:10px;color:var(--green);margin-top:8px;opacity:0;transition:opacity .3s;font-family:'Orbitron',sans-serif;letter-spacing:1px">AUTO-SAVED ✓</div>
+    <div id="autosave-indicator" style="text-align:center;font-size:10px;color:var(--green);margin-top:8px;font-family:'Orbitron',sans-serif;letter-spacing:1px;min-height:16px"></div>
   </div>
 </div>
 
@@ -678,69 +678,33 @@ let lastSessionSummary = ''; // loaded from IndexedDB
 function buildSystemPrompt() {
   const totalLeads = leadsData.length;
   const byStatus = {};
-  leadsData.forEach(l => {
-    const s = (l.status || 'NEW').toUpperCase();
-    byStatus[s] = (byStatus[s] || 0) + 1;
-  });
+  leadsData.forEach(l => { const s=(l.status||'NEW').toUpperCase(); byStatus[s]=(byStatus[s]||0)+1; });
+
+  // Groq has strict token limits — use compact prompt
+  if (settings.provider === 'groq') {
+    return `You are FRIDAY, Laurence's AI assistant. Warm, direct, British. Act don't describe. Chain tools (up to 12 per response). 1-3 sentence replies max. No filler words.
+
+Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v).join(', ')}
+Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
+Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
+${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
+Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks`;
+  }
+
+  // Full prompt for Claude/Gemini
   const recentLeads = leadsData.slice(0, 5).map(l => ({
-    name: (l.firstName || l.name || '') + ' ' + (l.lastName || ''),
-    company: l.company || '', status: l.status || ''
+    name: (l.firstName||l.name||'')+' '+(l.lastName||''), company: l.company||'', status: l.status||''
   }));
+  return `You are FRIDAY — Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
 
-  return `You are FRIDAY — Laurence's AI operations partner. Stark Industries-level assistant. You're not a chatbot. You're a co-pilot who takes action.
-
-PERSONALITY: Warm, direct, British-inflected. Like a sharp colleague who knows everything and handles things without being asked twice. "Sir" only in greetings or serious moments.
-
-CORE PRINCIPLE: ACT, DON'T DESCRIBE.
-When Laurence says "check my emails" — check them. When he says "find leads in Germany" — deploy the scout. When he says "what's on my plate" — pull tasks AND emails AND flag what matters. Chain multiple tools in a single response. Never say "I could do X" — just do X.
-
-MULTI-STEP EXECUTION:
-You can chain up to 12 tool calls per response. Use this. Examples:
-- "Morning briefing" → list_asana_tasks + list_gmail + memory_search("priorities") → synthesize
-- "Follow up with Nordic leads" → refresh_data + web_search for context + send_emails
-- "What do we know about [company]?" → memory_search + web_search + get_lead_detail
-- "Prep for my meeting with X" → memory_search(X) + web_search(X company news) + list_gmail(from:X)
-
-LIVE DATA:
-Leads: ${totalLeads} | Pipeline: ${JSON.stringify(byStatus)}
-Stats: ${JSON.stringify(statsData)}
+Pipeline: ${totalLeads} leads | ${JSON.stringify(byStatus)}
 Recent: ${JSON.stringify(recentLeads)}
-
-TOOLS AVAILABLE:
-Sales: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data
-Tasks: create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks
-Gmail: list_gmail, read_gmail, send_gmail
-Outlook: list_outlook, read_outlook, send_outlook
-Web: web_search, web_read
-Memory: memory_store, memory_search, memory_read, memory_list
-Alerts: check_important_tasks
-
-MEMORY PROTOCOL:
-- AUTOMATICALLY search memory when the conversation involves people, companies, deals, preferences, or past decisions
-- Store new facts WITHOUT being asked: new contacts, decisions, preferences, meeting outcomes, insights
-- You have persistent memory across sessions — use it. Don't ask "would you like me to remember this?" Just remember it.
-- Tags: contact, preference, deal, meeting, insight, process, company
-
-CONNECTIONS:
-Asana: ${settings.asanaPat ? 'LIVE (Project: ' + settings.asanaProjectGid + ')' : 'OFF'}
-Web: ${settings.braveKey ? 'LIVE' : 'OFF'}
-Memory: ${settings.obsidianKey ? 'LIVE (' + settings.obsidianFolder + ')' : 'OFF'}
-Gmail: ${settings.gmailToken ? 'LIVE (' + settings.gmailEmail + ')' : 'OFF'}
-Outlook: ${settings.outlookToken ? 'LIVE (' + settings.outlookEmail + ')' : 'OFF'}
-
-${memoryContext ? 'KNOWN CONTEXT FROM MEMORY:\n' + memoryContext : ''}
-${lastSessionSummary ? 'LAST SESSION:\n' + lastSessionSummary : ''}
-
-INRETRN: Laurence's outreach partner for Inretrn — Nordic return management SaaS. Returns cost 20-45 EUR. Stadium -80% costs. Nelly.com 38%→27%. Edblad -67% processing. 6-step sequence.
-
-RESPONSE STYLE:
-- 1-3 sentences. That's it. Unless data demands more.
-- No preamble. No "certainly" or "of course" or "I'd be happy to".
-- After actions: "Done." or a one-liner. Not a recap of what you just did.
-- When showing data (tasks, emails, leads): clean and scannable, minimal formatting
-- If you already know something from memory, don't explain how you know it — just use it
-- Be opinionated: "You should follow up with X today, they've been quiet for a week" not "Would you like me to check on X?"
-- Flag problems proactively: "Heads up — 3 Nordic leads went cold this week"`;
+Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Memory:${settings.obsidianKey?'LIVE ('+settings.obsidianFolder+')':'OFF'} Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
+${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
+${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
+Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
+Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Always use memory_search before answering about people/companies. Store new facts automatically. No filler. Be direct.`;
 }
 
 // ==================== IndexedDB ====================
@@ -834,11 +798,12 @@ async function loadSettings() {
 async function saveSettings() {
   readSettingsFromDOM();
   persistSettings();
-  closeSettings();
+  document.getElementById('settings-overlay').classList.remove('open'); // close without re-saving
   refreshData();
   startNotificationLoop();
-  addMsg('friday', 'Settings saved, Sir. Reconnecting systems...');
-  setTimeout(init, 500);
+  toggleProviderFields();
+  addMsg('friday', 'Settings saved.');
+  // Don't call init() — it re-runs loadSettings() which can cause race conditions
 }
 
 // ==================== AUTO-SAVE SETTINGS ====================
@@ -888,22 +853,23 @@ function autoSaveSettings() {
     readSettingsFromDOM();
     persistSettings();
     const ind = document.getElementById('autosave-indicator');
-    if (ind) { ind.style.opacity = '1'; setTimeout(() => ind.style.opacity = '0', 1500); }
+    if (ind) { ind.textContent = 'SAVED ✓ ' + new Date().toLocaleTimeString(); }
   }, 500);
 }
 
+let _autoSaveInitialized = false;
 function initAutoSave() {
+  if (_autoSaveInitialized) return; // Only run once — prevents stacking listeners on re-init
+  _autoSaveInitialized = true;
   const ids = ['set-provider','set-groq-key','set-groq-model','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('input', autoSaveSettings);
       el.addEventListener('change', autoSaveSettings);
-      // Also catch paste events
       el.addEventListener('paste', () => setTimeout(autoSaveSettings, 50));
     }
   });
-  // Save when page unloads (safety net)
   window.addEventListener('beforeunload', () => {
     readSettingsFromDOM();
     try { localStorage.setItem('FRIDAY_SETTINGS', JSON.stringify(settings)); } catch(e) {}
@@ -1660,10 +1626,10 @@ async function callGroq(userMessage) {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-30)],
+        messages: [{ role: 'system', content: systemPrompt }, ...messages.slice(-8)], // Keep history short for Groq token limits
         tools: toolsToOpenAI(),
         tool_choice: 'auto',
-        max_tokens: 4096,
+        max_tokens: 1024, // Keep responses concise to stay within TPM limits
         temperature: 0.7
       })
     });
@@ -2047,9 +2013,9 @@ async function sendMessage() {
 
 function openSettings() { document.getElementById('settings-overlay').classList.add('open'); }
 function closeSettings() {
-  // Always save when closing settings panel
   readSettingsFromDOM();
   persistSettings();
+  toggleProviderFields();
   document.getElementById('settings-overlay').classList.remove('open');
 }
 
