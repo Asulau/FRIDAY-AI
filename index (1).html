@@ -1246,7 +1246,10 @@ async function callClaude(userMessage) {
 
 // ==================== VOICE (ElevenLabs) ====================
 async function speak(text) {
-  if (!settings.elevenKey || !settings.voiceId) return;
+  if (!settings.elevenKey || !settings.voiceId) {
+    console.warn('FRIDAY TTS: No ElevenLabs key or voice ID set.');
+    return;
+  }
   try {
     const cleanText = text.replace(/[*_`#]/g, '').substring(0, 1000);
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
@@ -1258,14 +1261,36 @@ async function speak(text) {
         voice_settings: { stability: 0.5, similarity_boost: 0.75 }
       })
     });
-    if (r.ok) {
-      const blob = await r.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
-      orbState = 'speaking';
-      audio.onended = () => { orbState = 'idle'; };
-      audio.play();
+
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('FRIDAY TTS failed:', r.status, errText);
+      addMsg('friday', `⚠️ Voice error (${r.status}): ${errText.substring(0, 150)}`);
+      return;
     }
-  } catch(e) { console.error('TTS error:', e); }
+
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    orbState = 'speaking';
+    audio.onended = () => { orbState = 'idle'; URL.revokeObjectURL(url); };
+    audio.onerror = (e) => {
+      console.error('FRIDAY audio playback error:', e);
+      orbState = 'idle';
+      addMsg('friday', '⚠️ Audio playback failed — check browser autoplay settings.');
+    };
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(e => {
+        console.error('FRIDAY play() blocked:', e);
+        orbState = 'idle';
+        addMsg('friday', '⚠️ Audio blocked by browser. Click anywhere on the page first, then try again.');
+      });
+    }
+  } catch(e) {
+    console.error('FRIDAY TTS error:', e);
+    addMsg('friday', `⚠️ Voice connection error: ${e.message}`);
+  }
 }
 
 // ==================== VOICE INPUT ====================
