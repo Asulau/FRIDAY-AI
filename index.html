@@ -41,13 +41,11 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 /* INPUT */
 .input-area{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center}
-.input-area input[type=text]{flex:1;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:13px;outline:none}
-.input-area input[type=text]:focus{border-color:var(--cyan);box-shadow:0 0 10px var(--cyan-dim)}
-.input-area input[type=text]::placeholder{color:#3a5060}
-.send-btn,.mic-btn,.file-btn{background:none;border:1px solid var(--border);color:var(--cyan);width:40px;height:40px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s}
-.send-btn:hover,.mic-btn:hover,.file-btn:hover{background:var(--cyan-dim);border-color:var(--cyan)}
-.file-btn{font-size:16px;text-decoration:none}
-.file-input{display:none}
+.input-area input{flex:1;background:#0a1020;border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:13px;outline:none}
+.input-area input:focus{border-color:var(--cyan);box-shadow:0 0 10px var(--cyan-dim)}
+.input-area input::placeholder{color:#3a5060}
+.send-btn,.mic-btn{background:none;border:1px solid var(--border);color:var(--cyan);width:40px;height:40px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s}
+.send-btn:hover,.mic-btn:hover{background:var(--cyan-dim);border-color:var(--cyan)}
 .mic-btn.recording{background:var(--red);border-color:var(--red);color:#fff;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 /* BOTTOM BAR */
@@ -67,9 +65,6 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 .settings-save{background:var(--cyan);color:var(--bg);border:none;padding:10px 24px;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:11px;cursor:pointer;letter-spacing:2px;margin-top:8px}
 .settings-save:hover{opacity:.8}
 .settings-close{float:right;background:none;border:none;color:var(--red);font-size:18px;cursor:pointer}
-.obs-upload-btn{background:transparent;color:var(--cyan);border:1px solid var(--cyan);padding:6px 16px;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:10px;cursor:pointer;letter-spacing:1px;margin-top:4px}
-.obs-upload-btn:hover{background:var(--cyan-dim)}
-.mem-clear-btn{background:transparent;color:var(--red);border:1px solid var(--red);padding:6px 16px;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:10px;cursor:pointer;letter-spacing:1px;margin-top:4px;margin-left:8px}
 /* ORBITAL ANIMATION */
 .orbital-container{position:absolute;top:50%;left:40%;transform:translate(-50%,-50%);pointer-events:none;opacity:.08}
 .orbital{border:1px solid var(--cyan);border-radius:50%;position:absolute;animation:spin linear infinite}
@@ -99,7 +94,6 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
     <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
     <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
-    <div class="stat-row"><span>Obsidian</span><span class="stat-val red" id="obsidian-status">NO KEY</span></div>
   </div>
   <div class="panel-box">
     <div class="panel-title">PIPELINE</div>
@@ -113,7 +107,6 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="panel-title">MEMORY</div>
     <div class="stat-row"><span>MESSAGES</span><span class="stat-val" id="mem-msgs">0</span></div>
     <div class="stat-row"><span>SESSIONS</span><span class="stat-val" id="mem-sessions">0</span></div>
-    <div class="stat-row"><span>KNOWLEDGE</span><span class="stat-val" id="mem-knowledge">0</span></div>
   </div>
 </div>
 
@@ -142,8 +135,6 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 
   <div class="input-area">
     <input type="text" id="input" placeholder="Ask or type a command, Sir..." autocomplete="off">
-    <label class="file-btn" for="file-upload" title="Upload file / Obsidian note">&#128206;</label>
-    <input type="file" id="file-upload" class="file-input" accept=".txt,.md,.html,.json,.csv,.pdf" multiple>
     <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Voice input">&#x1F3A4;</button>
     <button class="send-btn" onclick="sendMessage()" title="Send">&#x27A4;</button>
   </div>
@@ -154,10 +145,6 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="connector-pill"><span class="dot" id="dot-gcal"></span>GCAL</div>
     <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
     <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
-    <div class="connector-pill" id="obs-pill" onclick="document.getElementById('obs-quick-upload').click()" title="Upload Obsidian notes (.md/.txt) to FRIDAY's memory" style="cursor:pointer;border-color:#0af;color:#0af">
-      <span style="font-size:11px">ð</span> OBSIDIAN <span id="obs-count" style="color:#0af">(0)</span>
-    </div>
-    <input type="file" id="obs-quick-upload" style="display:none" accept=".md,.txt" multiple>
   </div>
 </div>
 
@@ -187,37 +174,16 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <input type="password" id="set-asana-pat" placeholder="1/12345...">
     </div>
     <div class="setting-group">
-      <label>ASAMA PROJECT GID</label>
+      <label>ASANA PROJECT GID</label>
       <input type="text" id="set-asana-project" placeholder="1213654696710519">
-    </div>
-    <div class="setting-group">
-      <label>GOOGLE CALENDAR ICS URL (from Google Calendar settings â Share â Get shareable link)</label>
-      <input type="text" id="set-gcal-ics" placeholder="https://calendar.google.com/calendar/ical/...">
     </div>
     <div class="setting-group">
       <label>CLAUDE MODEL</label>
       <select id="set-model">
-        <option value="claude-sonnet-4-6">Claude Sonnet 4 (Recommended)</option>
-        <option value="claude-opus-4-6">Claude Opus 4 (Most Capable)</option>
-        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Fastest)</option>
+        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+        <option value="claude-opus-4-20250514">Claude Opus 4</option>
+        <option value="claude-haiku-4-20250307">Claude Haiku 4</option>
       </select>
-    </div>
-    <div class="setting-group">
-      <label>OBSIDIAN LOCAL REST API uRL (install plugin: obsidian-local-rest-api)</label>
-      <input type="text" id="set-obsidian-url" placeholder="https://localhost:27124">
-    </div>
-    <div class="setting-group">
-      <label>OBSIDIAJ API KEY (from plugin settings â API Key)</label>
-      <input type="password" id="set-obsidian-key" placeholder="Your Obsidian Local REST API key">
-      <div style="font-size:10px;color:#3a5060;margin-top:4px">â  First visit https://localhost:27124 in Chrome to trust the self-signed certificate, then connect.</div>
-    </div>
-    <div class="setting-group">
-      <label>OBSIDIAN / KNOWLEDGE BASE (upload .md or .txt notes to build FRIDAY's memory)</label>
-      <br>
-      <button class="obs-upload-btn" onclick="document.getElementById('obs-upload').click()">&#128448; UPLOAD NotES</button>
-      <button class="mem-clear-btn" onclick="clearMemory()">&#x1F5D1; CLEAR MEMORY</button>
-      <input type="file" id="obs-upload" style="display:none" accept=".md,.txt" multiple>
-      <div style="font-size:10px;color:#3a5060;margin-top:6px" id="obs-status">No notes uploaded yet</div>
     </div>
     <button class="settings-save" onclick="saveSettings()">SAVE CONFIGURATION</button>
   </div>
@@ -226,19 +192,16 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 <script>
 // ==================== STATE ====================
 const DB_NAME = 'FRIDAY_DB';
-const DB_VERSION = 3; // bumped: adds 'memory' store
+const DB_VERSION = 2;
 let db = null;
 let settings = {
   apiKey: '',
   ccUrl: 'https://leadfinder-rho.vercel.app',
-  elevenKey '',
+  elevenKey: '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
-  model: 'claude-sonnet-4-6',
+  model: 'claude-sonnet-4-20250514',
   asanaPat: '',
-  asanaProjectGid: '1213654696710519',
-  gcalIcs: '',
-  obsidianUrl: 'https://localhost:27124',
-  obsidianKey: ''
+  asanaProjectGid: '1213654696710519'
 };
 let conversationHistory = [];
 let statsData = {};
@@ -248,10 +211,6 @@ let sessionCount = 0;
 let messageCount = 0;
 let isRecording = false;
 let mediaRecorder = null;
-let memoryItems = []; // persistent knowledge base
-let calendarEvents = []; // cached calendar data
-// AudioContext unlocked on first user click â survives async gaps (autoplay policy fix)
-let audioCtx = null;
 
 // ==================== TOOLS ====================
 const TOOLS = [
@@ -309,19 +268,6 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} }
   },
   {
-    name: 'update_email_template',
-    description: 'Update an email template/sequence step in the Command Center.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        step: { type: 'number', description: 'Email sequence step 1-6' },
-        subject: { type: 'string', description: 'Email subject line' },
-        body: { type: 'string', description: 'Email body text (can use {{firstName}}, {{company}}, {{title}} variables)' }
-      },
-      required: ['step', 'body']
-    }
-  },
-  {
     name: 'create_asana_task',
     description: 'Create a new task in Asana. Use this when asked to add a task, todo, action item, or reminder.',
     input_schema: {
@@ -370,96 +316,6 @@ const TOOLS = [
       },
       required: ['query']
     }
-  },
-  {
-    name: 'search_web',
-    description: 'Search the web for current information, news, research, or any topic. Use this to answer questions that require up-to-date information.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'The search query' }
-      },
-      required: ['query']
-    }
-  },
-  {
-    name: 'fetch_url',
-    description: 'Fetch and read the content of any URL â articles, docs, websites. Returns clean text.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'The full URL to fetch' }
-      },
-      required: ['url']
-    }
-  },
-  {
-    name: 'read_calendar',
-    description: 'Read upcoming events from Google Calendar.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        days_ahead: { type: 'number', description: 'How many days ahead to look (default 7)', default: 7 }
-      }
-    }
-  },
-  {
-    name: 'save_memory',
-    description: 'Save an important fact, preference, or piece of information to persistent memory for future sessions. Use this to remember things Laurence tells you about himself, preferences, or important context.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        content: { type: 'string', description: 'The information to remember' },
-        category: { type: 'string', description: 'Category: preference, fact, goal, relationship, project', default: 'fact' }
-      },
-      required: ['content']
-    }
-  },
-  {
-    name: 'recall_memory',
-    description: 'Search through stored memories and knowledge base for relevant information.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'What to search for in memory' }
-      },
-      required: ['query']
-    }
-  },
-  {
-    name: 'search_obsidian',
-    description: 'Search notes in the Obsidian vault via Local REST API. Use when asked to find notes, recall vault knowledge, or look up anything in Obsidian.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search term to find in Obsidian notes' }
-      },
-      required: ['query']
-    }
-  },
-  {
-    name: 'read_obsidian_note',
-    description: 'Read the full contents of a specific Obsidian note by path.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'Path to the note, e.g. "Projects/Inretrn.md"' }
-      },
-      required: ['path']
-    }
-  },
-  {
-    name: 'write_obsidian_note',
-    description: 'Create or update a note in the Obsidian vault. Use for saving summaries, action items, or any content the user wants stored in Obsidian.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'Path for the note, e.g. "FRIDAY/Notes.md"' },
-        content: { type: 'string', description: 'Markdown content to write' },
-        append: { type: 'boolean', description: 'If true, append to existing note. Default false (overwrite).', default: false }
-      },
-      required: ['path', 'content']
-    }
   }
 ];
 
@@ -477,28 +333,15 @@ function buildSystemPrompt() {
     email: l.email || '', status: l.status || ''
   }));
 
-  const recentMemory = memoryItems.slice(-30).map(m =>
-    `[${m.category || 'fact'}] ${m.content}`
-  ).join('\n');
-
-  const calendarSnippet = calendarEvents.slice(0, 5).map(e =>
-    `- ${e.title} @ ${e.start}`
-  ).join('\n');
-
   return `You are FRIDAY, an AI operations assistant built for Laurence Idelenburg. Think Stark Industries AI but for sales operations. Warm British tone, professional but personable. Address Laurence as "Sir" occasionally.
 
-You are CONNECTED to the Stark Industries Command Center. You have LIVE data AND can execute actions via tools. You have a persistent memory that grows over time.
+You are CONNECTED to the Stark Industries Command Center. You have LIVE data AND can execute actions via tools.
 
 CURRENT LIVE DATA:
 - Total Leads: ${totalLeads}
 - Pipeline: ${JSON.stringify(byStatus)}
 - Stats: ${JSON.stringify(statsData)}
 - Recent Leads: ${JSON.stringify(recentLeads)}
-
-${calendarEvents.length > 0 ? `UPCOMING CALENDAR:\n${calendarSnippet}\n` : ''}
-
-PERSONAL MEMORY (accumulated knowledge about Laurence and his business):
-${recentMemory || 'Building memory as we work together...'}
 
 CAPABILITIES (use your tools when asked):
 SALES OPS:
@@ -507,41 +350,19 @@ SALES OPS:
 3. update_lead â Update lead status/notes
 4. get_lead_detail â Look up a lead
 5. refresh_data â Refresh cache
-6. update_email_template â Change email templates/sequence steps
 
 TASK MANAGEMENT (Asana):
-7. create_asana_task â Create tasks, todos, reminders
-8. list_asana_tasks â Show tasks and status
-9. update_asana_task â Update, complete, reschedule tasks
-10. search_asana_tasks â Search tasks by keyword
-
-WEB & RESEARCH:
-11. search_web â Search the web for current information
-12. fetch_url â Read any webpage or article
-
-CALENDAR:
-13. read_calendar â Read Google Calendar events
-
-MEMORY:
-14. save_memory â Save important facts for future sessions
-15. recall_memory â Search stored knowledge
-
-OBSIDIAN VAULT:
-16. search_obsidian â Search notes in Obsidian vault
-17. read_obsidian_note â Read a specific note by path
-18. write_obsidian_note â Create or update a note in Obsidian
+6. create_asana_task â Create tasks, todos, action items, reminders
+7. list_asana_tasks â Show current tasks and their status
+8. update_asana_task â Update, complete, reschedule tasks
+9. search_asana_tasks â Search tasks by keyword
 
 Asana Project: Arenzo (GID: ${settings.asanaProjectGid})
 Asana Connected: ${settings.asanaPat ? 'YES' : 'NO'}
-Calendar Connected: ${settings.gcalIcs ? 'YES' : 'NO'}
-Obsidian Connected: ${settings.obsidianKey ? 'YES' : 'NO'}
 
 INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%â27%. Edblad -67% processing. 6-step email sequence.
 
-BEHAVIOUR:
-- Proactively save important information Laurence shares using save_memory
-- Reference past memories to show continuity and personalisation
-- Use web search for anything requiring current information
+RULES:
 - Give concrete numbers from live data
 - Use tools when asked to take action â don't just describe
 - Keep responses concise like an ops briefing
@@ -558,7 +379,6 @@ function openDB() {
       if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings');
       if (!d.objectStoreNames.contains('history')) d.createObjectStore('history', { autoIncrement: true });
       if (!d.objectStoreNames.contains('sessions')) d.createObjectStore('sessions', { autoIncrement: true });
-      if (!d.objectStoreNames.contains('memory')) d.createObjectStore('memory', { autoIncrement: true });
     };
     req.onsuccess = e => { db = e.target.result; resolve(db); };
     req.onerror = e => reject(e);
@@ -582,32 +402,6 @@ async function dbPut(store, key, val) {
   });
 }
 
-async function dbAdd(store, val) {
-  return new Promise((resolve) => {
-    const tx = db.transaction(store, 'readwrite');
-    const req = tx.objectStore(store).add(val);
-    req.onsuccess = () => resolve(req.result);
-    tx.onerror = () => resolve(null);
-  });
-}
-
-async function dbGetAll(store) {
-  return new Promise((resolve) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => resolve([]);
-  });
-}
-
-async function dbClear(store) {
-  return new Promise((resolve) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.objectStore(store).clear();
-    tx.oncomplete = () => resolve();
-  });
-}
-
 async function dbCount(store) {
   return new Promise((resolve) => {
     const tx = db.transaction(store, 'readonly');
@@ -617,22 +411,6 @@ async function dbCount(store) {
   });
 }
 
-async function loadMemory() {
-  memoryItems = await dbGetAll('memory');
-  document.getElementById('mem-knowledge').textContent = memoryItems.length;
-}
-
-async function clearMemory() {
-  if (!confirm('Clear all memory and knowledge? This cannot be undone.')) return;
-  await dbClear('memory');
-  memoryItems = [];
-  document.getElementById('mem-knowledge').textContent = '0';
-  document.getElementById('obs-status').textContent = 'Memory cleared';
-  closeSettings();
-  addMsg('friday', 'Memory cleared, Sir. Starting fresh.');
-}
-
-// ==================== SETTINGS ====================
 async function loadSettings() {
   const saved = await dbGet('settings', 'config');
   if (saved) settings = { ...settings, ...saved };
@@ -642,13 +420,7 @@ async function loadSettings() {
   document.getElementById('set-voice-id').value = settings.voiceId || '';
   document.getElementById('set-asana-pat').value = settings.asanaPat || '';
   document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
-  document.getElementById('set-gcal-ics').value = settings.gcalIcs || '';
-  document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'https://localhost:27124';
-  document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
-  document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-6';
-  if (memoryItems.length > 0) {
-    document.getElementById('obs-status').textContent = memoryItems.length + ' items in memory';
-  }
+  document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
 }
 
 async function saveSettings() {
@@ -658,14 +430,11 @@ async function saveSettings() {
   settings.voiceId = document.getElementById('set-voice-id').value.trim();
   settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
   settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
-  settings.gcalIcs = document.getElementById('set-gcal-ics').value.trim();
-  settings.obsidianUrl = document.getElementById('set-obsidian-url').value.trim() || 'https://localhost:27124';
-  settings.obsidianKey = document.getElementById('set-obsidian-key').value.trim();
   settings.model = document.getElementById('set-model').value;
   await dbPut('settings', 'config', settings);
   closeSettings();
   refreshData();
-  addMsg('friday', 'Settings saved and locked into memory, Sir. Reconnecting systems...');
+  addMsg('friday', 'Settings saved, Sir. Reconnecting systems...');
   setTimeout(init, 500);
 }
 
@@ -751,273 +520,14 @@ async function asanaSearchTasks(params) {
   }))};
 }
 
-// ==================== WEB SEARCH ====================
-async function toolSearchWeb(params) {
-  const query = params.query;
-  const results = [];
-
-  // 1. Try DuckDuckGo Instant Answer API
-  try {
-    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`;
-    const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
-    const data = await r.json();
-    if (data.AbstractText) results.push({ title: data.Heading || query, snippet: data.AbstractText, url: data.AbstractURL || '' });
-    if (data.Answer) results.push({ title: 'Direct Answer', snippet: data.Answer, url: '' });
-    if (data.RelatedTopics) {
-      data.RelatedTopics.slice(0, 5).forEach(t => {
-        if (t.Text) results.push({ title: t.Text.substring(0, 80), snippet: t.Text, url: t.FirstURL || '' });
-      });
-    }
-  } catch(e) { /* DDG failed, continue */ }
-
-  // 2. Wikipedia search as reliable fallback
-  try {
-    const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/\s+/g, '_'))}`;
-    const rw = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
-    if (rw.ok) {
-      const wdata = await rw.json();
-      if (wdata.extract && wdata.type !== 'disambiguation') {
-        results.push({ title: `Wikipedia: ${wdata.title}`, snippet: wdata.extract.substring(0, 500), url: wdata.content_urls?.desktop?.page || '' });
-      }
-    }
-  } catch(e) { /* Wikipedia failed */ }
-
-  // 3. Wikipedia search API if exact title lookup failed
-  if (results.length === 0) {
-    try {
-      const wSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`;
-      const rs = await fetch(wSearchUrl, { signal: AbortSignal.timeout(5000) });
-      const sd = await rs.json();
-      (sd.query?.search || []).forEach(item => {
-        results.push({ title: item.title, snippet: item.snippet.replace(/<[^>]+>/g, ''), url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/\s/g,'_'))}` });
-      });
-    } catch(e) { /* Wikipedia search failed */ }
-  }
-
-  if (results.length === 0) {
-    return { success: false, error: `No results found for "${query}". Try a different search term.` };
-  }
-
-  return {
-    success: true,
-    query,
-    answer: results[0]?.snippet || '',
-    results: results.slice(0, 8),
-    note: 'Results from DuckDuckGo and Wikipedia'
-  };
-}
-
-// ==================== FETCH URL ====================
-async function toolFetchUrl(params) {
-  try {
-    const jinaUrl = `https://r.jina.ai/${params.url}`;
-    const r = await fetch(jinaUrl);
-    if (!r.ok) return { success: false, error: 'Could not fetch URL: ' + r.status };
-    const text = await r.text();
-    return { success: true, url: params.url, content: text.substring(0, 4000), length: text.length };
-  } catch(e) {
-    return { success: false, error: e.message };
-  }
-}
-
-// ==================== GOOGLE CALENDAR ====================
-async function toolReadCalendar(params) {
-  if (!settings.gcalIcs) {
-    return { success: false, error: 'No Google Calendar ICS URL configured. Go to Settings â Google Calendar ICS URL.' };
-  }
-  try {
-    const daysAhead = params.days_ahead || 7;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(settings.gcalIcs)}`;
-    const r = await fetch(proxyUrl);
-    if (!r.ok) return { success: false, error: 'Could not fetch calendar' };
-    const icsText = await r.text();
-    const events = parseICS(icsText);
-    const now = new Date();
-    const future = new Date(now.getTime() + daysAhead * 86400000);
-    const upcoming = events.filter(e => e.start >= now && e.start <= future)
-      .sort((a, b) => a.start - b.start)
-      .slice(0, 20);
-    calendarEvents = upcoming.map(e => ({
-      title: e.summary,
-      start: e.start.toLocaleString('en-GB', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      location: e.location || '',
-      description: e.description ? e.description.substring(0, 150) : ''
-    }));
-    // Update connector status
-    document.getElementById('gcal-status').textContent = 'ONLINE';
-    document.getElementById('gcal-status').className = 'stat-val green';
-    document.getElementById('dot-gcal').className = 'dot online';
-    return { success: true, events: calendarEvents, count: calendarEvents.length, period: `Next ${daysAhead} days` };
-  } catch(e) {
-    return { success: false, error: e.message };
-  }
-}
-
-function parseICS(icsText) {
-  const events = [];
-  const normalized = icsText.replace(/\r\n[ \t]/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const lines = normalized.split('\n');
-  let current = null;
-
-  for (const line of lines) {
-    if (line === 'BEGIN:VEVENT') { current = {}; }
-    else if (line === 'END:VEVENT') {
-      if (current && current.summary && current.start) events.push(current);
-      current = null;
-    } else if (current) {
-      const colon = line.indexOf(':');
-      if (colon < 0) continue;
-      const key = line.substring(0, colon).split(';')[0].toUpperCase();
-      const val = line.substring(colon + 1).replace(/\\n/g, ' ').replace(/\\,/g, ',').replace(/\\;/g, ';');
-      if (key === 'SUMMARY') current.summary = val;
-      else if (key === 'DTSTART') current.start = parseICSDate(line.substring(colon + 1));
-      else if (key === 'DTEND') current.end = parseICSDate(line.substring(colon + 1));
-      else if (key === 'LOCATION') current.location = val;
-      else if (key === 'DESCRIPTION') current.description = val;
-    }
-  }
-  return events;
-}
-
-function parseICSDate(str) {
-  const val = str.includes(':') ? str.split(':').pop() : str;
-  try {
-    if (val.includes('T')) {
-      const clean = val.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)/, '$1-$2-$3T$4:$5:$6$7');
-      return new Date(clean);
-    } else {
-      const clean = val.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-      return new Date(clean);
-    }
-  } catch(e) { return new Date(0); }
-}
-
-// ==================== MEMORY TOOLS ====================
-async function toolSaveMemory(params) {
-  const item = {
-    content: params.content,
-    category: params.category || 'fact',
-    timestamp: Date.now()
-  };
-  await dbAdd('memory', item);
-  memoryItems.push(item);
-  if (memoryItems.length > 200) memoryItems = memoryItems.slice(-200);
-  document.getElementById('mem-knowledge').textContent = memoryItems.length;
-  return { success: true, message: 'Remembered: ' + params.content.substring(0, 80) };
-}
-
-async function toolRecallMemory(params) {
-  const query = (params.query || '').toLowerCase();
-  const relevant = memoryItems.filter(m =>
-    m.content.toLowerCase().includes(query)
-  ).slice(-15);
-  return {
-    success: true,
-    query,
-    count: relevant.length,
-    memories: relevant.map(m => ({
-      content: m.content,
-      category: m.category || 'fact',
-      date: new Date(m.timestamp).toLocaleDateString('en-GB')
-    }))
-  };
-}
-
-// ==================== OBSIDIAN LOCAL REST API ====================
-async function obsidianApi(method, path, body = null) {
-  const base = (settings.obsidianUrl || 'https://localhost:27124').replace(/\/$/, '');
-  const headers = { 'Authorization': `Bearer ${settings.obsidianKey}`, 'Content-Type': 'application/json' };
-  const opts = { method, headers };
-  if (body !== null) opts.body = typeof body === 'string' ? body : JSON.stringify(body);
-  const r = await fetch(`${base}${path}`, opts);
-  return r;
-}
-
-async function toolSearchObsidian(params) {
-  if (!settings.obsidianKey) return { success: false, error: 'No Obsidian API key configured. Go to Settings â Obsidian API Key.' };
-  try {
-    const r = await obsidianApi('POST', '/search/simple/', JSON.stringify({ query: params.query, contextLength: 200 }));
-    if (!r.ok) {
-      const txt = await r.text();
-      return { success: false, error: `Obsidian API error ${r.status}: ${txt.substring(0, 200)}` };
-    }
-    const results = await r.json();
-    if (!results.length) return { success: true, query: params.query, count: 0, results: [], note: 'No matching notes found.' };
-    return {
-      success: true, query: params.query, count: results.length,
-      results: results.slice(0, 8).map(r => ({ filename: r.filename, score: r.score, excerpt: r.context?.join('...') || '' })),
-      note: 'Results from your Obsidian vault'
-    };
-  } catch(e) {
-    return { success: false, error: `Could not reach Obsidian: ${e.message}. Make sure the Local REST API plugin is running and you have trusted the certificate at ${settings.obsidianUrl}.` };
-  }
-}
-
-async function toolReadObsidianNote(params) {
-  if (!settings.obsidianKey) return { success: false, error: 'No Obsidian API key configured.' };
-  try {
-    const encodedPath = encodeURIComponent(params.path);
-    const r = await obsidianApi('GET', `/vault/${encodedPath}`);
-    if (!r.ok) return { success: false, error: `Note not found: ${params.path} (${r.status})` };
-    const content = await r.text();
-    return { success: true, path: params.path, content: content.substring(0, 6000), length: content.length };
-  } catch(e) {
-    return { success: false, error: `Could not reach Obsidian: ${e.message}` };
-  }
-}
-
-async function toolWriteObsidianNote(params) {
-  if (!settings.obsidianKey) return { success: false, error: 'No Obsidian API key configured.' };
-  try {
-    const encodedPath = encodeURIComponent(params.path);
-    let content = params.content;
-    if (params.append) {
-      const existing = await obsidianApi('GET', `/vault/${encodedPath}`);
-      if (existing.ok) { const text = await existing.text(); content = text + '\n\n' + content; }
-    }
-    const r = await obsidianApi('PUT', `/vault/${encodedPath}`, content);
-    if (!r.ok) return { success: false, error: `Write failed: ${r.status}` };
-    return { success: true, path: params.path, action: params.append ? 'appended' : 'written', length: content.length };
-  } catch(e) {
-    return { success: false, error: `Could not reach Obsidian: ${e.message}` };
-  }
-}
-
-// ==================== EMAIL TEMPLATE ====================
-async function toolUpdateTemplate(params) {
-  try {
-    const r = await fetch(settings.ccUrl + '/api/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'update_template',
-        params: { step: params.step, subject: params.subject, body: params.body }
-      })
-    });
-    const result = await r.json();
-    return { success: true, ...result };
-  } catch(e) {
-    return { success: false, error: 'Template update failed: ' + e.message };
-  }
-}
-
-// ==================== EXECUTE ACTION ====================
 async function executeAction(name, params) {
+  // Route Asana tools
   if (name === 'create_asana_task') return asanaCreateTask(params);
   if (name === 'list_asana_tasks') return asanaListTasks(params);
   if (name === 'update_asana_task') return asanaUpdateTask(params);
   if (name === 'search_asana_tasks') return asanaSearchTasks(params);
-  if (name === 'search_web') return toolSearchWeb(params);
-  if (name === 'fetch_url') return toolFetchUrl(params);
-  if (name === 'read_calendar') return toolReadCalendar(params);
-  if (name === 'save_memory') return toolSaveMemory(params);
-  if (name === 'recall_memory') return toolRecallMemory(params);
-  if (name === 'search_obsidian') return toolSearchObsidian(params);
-  if (name === 'read_obsidian_note') return toolReadObsidianNote(params);
-  if (name === 'write_obsidian_note') return toolWriteObsidianNote(params);
-  if (name === 'update_email_template') return toolUpdateTemplate(params);
 
+  // Command Center tools
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', {
     method: 'POST',
@@ -1033,6 +543,7 @@ async function refreshData() {
 }
 
 function updatePanels(ccOnline) {
+  // Command Center status
   const ccEl = document.getElementById('cc-status');
   const dotCc = document.getElementById('dot-cc');
   if (ccOnline) {
@@ -1043,6 +554,7 @@ function updatePanels(ccOnline) {
     dotCc.className = 'dot';
   }
 
+  // Asana status
   const asanaEl = document.getElementById('asana-status');
   const dotAsana = document.getElementById('dot-asana');
   if (settings.asanaPat) {
@@ -1053,6 +565,7 @@ function updatePanels(ccOnline) {
     dotAsana.className = 'dot';
   }
 
+  // Engine status
   const engineEl = document.getElementById('engine');
   if (settings.apiKey) {
     engineEl.textContent = 'ANTHROPIC'; engineEl.className = 'stat-val green';
@@ -1060,6 +573,7 @@ function updatePanels(ccOnline) {
     engineEl.textContent = 'NO KEY'; engineEl.className = 'stat-val red';
   }
 
+  // Voice
   const voiceEl = document.getElementById('voice-status');
   if (settings.elevenKey) {
     voiceEl.textContent = 'ELEVENLABS'; voiceEl.className = 'stat-val green';
@@ -1067,18 +581,7 @@ function updatePanels(ccOnline) {
     voiceEl.textContent = 'OFF'; voiceEl.className = 'stat-val red';
   }
 
-  if (settings.gcalIcs) {
-    document.getElementById('gcal-status').textContent = 'CONFIGURED';
-    document.getElementById('gcal-status').className = 'stat-val orange';
-  }
-
-  const obsEl = document.getElementById('obsidian-status');
-  if (settings.obsidianKey) {
-    obsEl.textContent = 'CONFIGURED'; obsEl.className = 'stat-val orange';
-  } else {
-    obsEl.textContent = 'NO KEY'; obsEl.className = 'stat-val red';
-  }
-
+  // Pipeline
   if (statsData.pipeline) {
     const p = statsData.pipeline;
     document.getElementById('pl-leads').textContent = p.totalLeads || 0;
@@ -1091,14 +594,15 @@ function updatePanels(ccOnline) {
   }
 }
 
-// ==================== CLAUDE	API ====================
+// ==================== CLAUDE API (DIRECT) ====================
 async function callClaude(userMessage) {
   if (!settings.apiKey) {
-    return { text: "I need an API key to connect to my AI core, Sir. Open Settings (â) and enter your Anthropic API key.", tools: [] };
+    return { text: "I need an API key to connect to my AI core, Sir. Open Settings and enter your Anthropic API key.", tools: [] };
   }
 
   conversationHistory.push({ role: 'user', content: userMessage });
-  let messages = conversationHistory.slice(-20);
+
+  let messages = conversationHistory.slice(-20); // keep last 20 for context
   let response;
 
   try {
@@ -1129,8 +633,9 @@ async function callClaude(userMessage) {
 
   let data = await response.json();
   let toolsUsed = [];
-  let iterations = 0;
 
+  // Tool use loop
+  let iterations = 0;
   while (data.stop_reason === 'tool_use' && iterations < 5) {
     iterations++;
     conversationHistory.push({ role: 'assistant', content: data.content });
@@ -1139,12 +644,14 @@ async function callClaude(userMessage) {
     for (const block of data.content) {
       if (block.type !== 'tool_use') continue;
       toolsUsed.push(block.name);
+
       let result;
       try {
         result = await executeAction(block.name, block.input);
       } catch(e) {
         result = { success: false, error: e.message };
       }
+
       toolResults.push({
         type: 'tool_result',
         tool_use_id: block.id,
@@ -1174,10 +681,11 @@ async function callClaude(userMessage) {
       });
       data = await resp2.json();
     } catch(e) {
-      return { text: "Lost connection during tool execution, Sir: " + e.message, tools: toolsUsed };
+      return { text: "Lost connection during tool execution: " + e.message, tools: toolsUsed };
     }
   }
 
+  // Extract text
   let text = '';
   for (const block of (data.content || [])) {
     if (block.type === 'text') text += block.text;
@@ -1186,24 +694,17 @@ async function callClaude(userMessage) {
 
   conversationHistory.push({ role: 'assistant', content: data.content || [{ type: 'text', text }] });
 
+  // Refresh panels after tool use
   if (toolsUsed.length > 0) refreshData();
 
   return { text, tools: toolsUsed };
 }
 
 // ==================== VOICE (ElevenLabs) ====================
-// Unlock AudioContext on every user click â once running, it survives async gaps
-document.addEventListener('click', () => {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-});
-
 async function speak(text) {
   if (!settings.elevenKey || !settings.voiceId) return;
   try {
-    const cleanText = text.replace(/[*_`#\[\]]/g, '').substring(0, 1000);
+    const cleanText = text.replace(/[*_`#]/g, '').substring(0, 1000);
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
@@ -1213,22 +714,10 @@ async function speak(text) {
         voice_settings: { stability: 0.5, similarity_boost: 0.75 }
       })
     });
-    if (!r.ok) { console.error('TTS API error:', r.status); return; }
-    const blob = await r.blob();
-    // Prefer AudioContext (immune to autoplay policy after user click)
-    if (audioCtx && audioCtx.state === 'running') {
-      const arrayBuffer = await blob.arrayBuffer();
-      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-      const source = audioCtx.createBufferSource();
-      source.buffer = decoded;
-      source.connect(audioCtx.destination);
-      source.start(0);
-    } else {
-      // Fallback: plain Audio element
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      audio.play().catch(e => console.warn('TTS play blocked:', e));
+    if (r.ok) {
+      const blob = await r.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.play();
     }
   } catch(e) { console.error('TTS error:', e); }
 }
@@ -1247,7 +736,8 @@ async function startRecording() {
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      addMsg('friday', 'Voice captured, Sir. Speech-to-text via Whisper API coming in next update â please type for now.');
+      // For now, show a message â STT would need Whisper API
+      addMsg('friday', 'Voice input received, Sir. Speech-to-text coming soon â please type for now.');
     };
     mediaRecorder.start();
     isRecording = true;
@@ -1262,85 +752,6 @@ function stopRecording() {
     mediaRecorder.stop();
     isRecording = false;
     document.getElementById('mic-btn').classList.remove('recording');
-  }
-}
-
-// ==================== FILE UPLOAD ====================
-document.getElementById('file-upload').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
-
-  for (const file of files) {
-    try {
-      const text = await file.text();
-      const truncated = text.substring(0, 8000);
-      const content = `FILE UPLOADED: ${file.name}\n\n${truncated}`;
-      await toolSaveMemory({ content, category: 'file' });
-      addMsg('friday', `File "${file.name}" loaded into memory, Sir. ${Math.round(text.length / 1000)}KB stored. I can now reference its contents in our conversation.`);
-    } catch(err) {
-      addMsg('friday', `Could not read "${file.name}", Sir: ${err.message}`);
-    }
-  }
-  e.target.value = '';
-});
-
-document.getElementById('obs-upload').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
-  let count = 0;
-
-  for (const file of files) {
-    try {
-      const text = await file.text();
-      const truncated = text.substring(0, 5000);
-      await toolSaveMemory({
-        content: `OBSIDIAN NOTE â ${file.name}:\n${truncated}`,
-        category: 'obsidian'
-      });
-      count++;
-    } catch(err) {
-      console.error('Obsidian upload error:', err);
-    }
-  }
-
-  e.target.value = '';
-  document.getElementById('obs-status').textContent = count + ' note(s) added â ' + memoryItems.length + ' total in memory';
-  updateObsCount();
-  closeSettings();
-  addMsg('friday', `${count} Obsidian note${count > 1 ? 's' : ''} uploaded to memory, Sir. I'll use this context to personalise our interactions.`);
-});
-
-// Quick-upload from bottom bar OBSIDIAN pill
-async function handleObsFiles(files) {
-  if (!files.length) return;
-  let count = 0;
-  for (const file of files) {
-    try {
-      const text = await file.text();
-      const truncated = text.substring(0, 5000);
-      await toolSaveMemory({
-        content: `OBSIDIAN NOTE â ${file.name}:\n${truncated}`,
-        category: 'obsidian'
-      });
-      count++;
-    } catch(err) { console.error('Obsidian upload error:', err); }
-  }
-  updateObsCount();
-  addMsg('friday', `${count} Obsidian note${count > 1 ? 's' : ''} uploaded to memory, Sir. ${memoryItems.length} total items in memory.`);
-}
-
-document.getElementById('obs-quick-upload').addEventListener('change', async (e) => {
-  await handleObsFiles(Array.from(e.target.files));
-  e.target.value = '';
-});
-
-function updateObsCount() {
-  const obsCount = memoryItems.filter(m => m.category === 'obsidian').length;
-  const el = document.getElementById('obs-count');
-  if (el) {
-    el.textContent = `(${obsCount})`;
-    const pill = document.getElementById('obs-pill');
-    if (pill) pill.querySelector('.dot') && null; // no dot needed
   }
 }
 
@@ -1371,7 +782,6 @@ function addMsg(type, text, tools) {
 }
 
 async function sendMessage() {
-
   const input = document.getElementById('input');
   const msg = input.value.trim();
   if (!msg) return;
@@ -1379,28 +789,30 @@ async function sendMessage() {
   input.value = '';
   addMsg('user', msg);
 
+  // Show typing indicator
   const typingDiv = document.createElement('div');
   typingDiv.className = 'msg friday';
   typingDiv.innerHTML = '<div class="msg-label">F.R.I.D.A.Y.</div><span style="opacity:.5">Processing...</span>';
   typingDiv.id = 'typing';
   document.getElementById('chat').appendChild(typingDiv);
-  document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
 
   const result = await callClaude(msg);
 
+  // Remove typing
   const t = document.getElementById('typing');
   if (t) t.remove();
 
   addMsg('friday', result.text, result.tools);
   speak(result.text);
 
+  // Save to DB
   if (db) {
     const tx = db.transaction('history', 'readwrite');
     tx.objectStore('history').add({ user: msg, friday: result.text, tools: result.tools, time: Date.now() });
   }
 }
 
-function openSettings() { loadSettings(); document.getElementById('settings-overlay').classList.add('open'); }
+function openSettings() { document.getElementById('settings-overlay').classList.add('open'); }
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
 
 // ==================== CLOCK & UPTIME ====================
@@ -1415,6 +827,7 @@ function updateClock() {
   const s = String(elapsed % 60).padStart(2, '0');
   document.getElementById('uptime').textContent = `${h}:${m}:${s}`;
 
+  // Fake system stats
   document.getElementById('cpu').textContent = Math.floor(8 + Math.random() * 15) + '%';
   document.getElementById('mem').textContent = (3.5 + Math.random() * 1.5).toFixed(1) + ' GB';
 }
@@ -1423,45 +836,41 @@ function updateClock() {
 async function init() {
   await openDB();
   await loadSettings();
-  await loadMemory();
-  updateObsCount();
 
+  // Count sessions
   sessionCount = await dbCount('sessions');
   sessionCount++;
   const tx = db.transaction('sessions', 'readwrite');
   tx.objectStore('sessions').add({ time: Date.now() });
   document.getElementById('mem-sessions').textContent = sessionCount;
 
+  // Message count from history
   messageCount = await dbCount('history');
   document.getElementById('mem-msgs').textContent = messageCount;
 
+  // Clock
   updateClock();
   setInterval(updateClock, 1000);
 
+  // Fetch data
   await refreshData();
 
-  // Auto-fetch calendar if configured
-  if (settings.gcalIcs) {
-    toolReadCalendar({ days_ahead: 7 }).catch(() => {});
-  }
-
+  // Greeting
   const hour = new Date().getHours();
   let greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   if (!settings.apiKey) {
-    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (â) and enter your Anthropic API key to activate full operations. Your settings will be saved permanently.`);
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (â) and enter your Anthropic API key to activate full operations.`);
   } else {
     const leadCount = leadsData.length;
     const newCount = leadsData.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
-    const memCount = memoryItems.length;
-    const memNote = memCount > 0 ? ` I have ${memCount} items in memory from our past work.` : '';
-    const asanaNote = settings.asanaPat ? ' Asana live.' : '';
-    const calNote = settings.gcalIcs ? ' Calendar connected.' : '';
-    addMsg('friday', `${greeting}, Sir. All systems operational.${asanaNote}${calNote}${memNote} ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
+    const asanaMsg = settings.asanaPat ? ' Asana task management is live.' : '';
+    addMsg('friday', `${greeting}, Sir. All systems operational. I'm connected to Claude, Command Center, and task ops.${asanaMsg} ${leadCount} leads in pipeline, ${newCount} awaiting outreach. What are we working on?`);
+    speak(`${greeting}, Sir. All systems operational. ${leadCount} leads in pipeline. What are we working on?`);
   }
 }
 
-// Key handlers
+// Key handler
 document.getElementById('input').addEventListener('keydown', e => {
   if (e.key === 'Enter') sendMessage();
 });
