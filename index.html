@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F.R.I.D.A.Y. — Personal AI Assistant</title>
+<title>F.R.I.D.A.Y. â Personal AI Assistant</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 @font-face{font-family:'Orbitron';src:url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap')}
@@ -27,7 +27,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 .clock-date{font-size:10px;color:var(--text);opacity:.6;text-align:center}
 .title{font-family:'Orbitron',sans-serif;font-size:20px;letter-spacing:8px;color:var(--cyan)}
 .header-btns{display:flex;gap:8px}
-.header-btn{background:none;border:1px solid var(--border);color:var(--cyan);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
+.header-btn{Background:none;border:1px solid var(--border);color:var(--cyan);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
 .header-btn:hover{background:var(--cyan-dim);border-color:var(--cyan)}
 /* CHAT */
 .chat-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
@@ -153,6 +153,10 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="connector-pill"><span class="dot" id="dot-gcal"></span>GCAL</div>
     <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
     <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
+    <div class="connector-pill" id="obs-pill" onclick="document.getElementById('obs-quick-upload').click()" title="Upload Obsidian notes (.md/.txt) to FRIDAY's memory" style="cursor:pointer;border-color:#0af;color:#0af">
+      <span style="font-size:11px">ð</span> OBSIDIAN <span id="obs-count" style="color:#0af">(0)</span>
+    </div>
+    <input type="file" id="obs-quick-upload" style="display:none" accept=".md,.txt" multiple>
   </div>
 </div>
 
@@ -186,7 +190,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <input type="text" id="set-asana-project" placeholder="1213654696710519">
     </div>
     <div class="setting-group">
-      <label>GOOGLE CALENDAR ICS URL (from Google Calendar settings → Share → Get shareable link)</label>
+      <label>GOOGLE CALENDAR ICS URL (from Google Calendar settings â Share â Get shareable link)</label>
       <input type="text" id="set-gcal-ics" placeholder="https://calendar.google.com/calendar/ical/...">
     </div>
     <div class="setting-group">
@@ -234,7 +238,7 @@ let isRecording = false;
 let mediaRecorder = null;
 let memoryItems = []; // persistent knowledge base
 let calendarEvents = []; // cached calendar data
-let audioUnlocked = false;
+// audioUnlocked removed â browser allows play() after any user interaction
 
 // ==================== TOOLS ====================
 const TOOLS = [
@@ -330,7 +334,7 @@ const TOOLS = [
   },
   {
     name: 'update_asana_task',
-    description: 'Update an existing Asana task — mark complete, change due date, rename, add notes.',
+    description: 'Update an existing Asana task â mark complete, change due date, rename, add notes.',
     input_schema: {
       type: 'object',
       properties: {
@@ -367,7 +371,7 @@ const TOOLS = [
   },
   {
     name: 'fetch_url',
-    description: 'Fetch and read the content of any URL — articles, docs, websites. Returns clean text.',
+    description: 'Fetch and read the content of any URL â articles, docs, websites. Returns clean text.',
     input_schema: {
       type: 'object',
       properties: {
@@ -450,42 +454,42 @@ ${recentMemory || 'Building memory as we work together...'}
 
 CAPABILITIES (use your tools when asked):
 SALES OPS:
-1. deploy_scout — Find new leads in a region
-2. send_emails — Send outreach emails
-3. update_lead — Update lead status/notes
-4. get_lead_detail — Look up a lead
-5. refresh_data — Refresh cache
-6. update_email_template — Change email templates/sequence steps
+1. deploy_scout â Find new leads in a region
+2. send_emails â Send outreach emails
+3. update_lead â Update lead status/notes
+4. get_lead_detail â Look up a lead
+5. refresh_data â Refresh cache
+6. update_email_template â Change email templates/sequence steps
 
 TASK MANAGEMENT (Asana):
-7. create_asana_task — Create tasks, todos, reminders
-8. list_asana_tasks — Show tasks and status
-9. update_asana_task — Update, complete, reschedule tasks
-10. search_asana_tasks — Search tasks by keyword
+7. create_asana_task â Create tasks, todos, reminders
+8. list_asana_tasks â Show tasks and status
+9. update_asana_task â Update, complete, reschedule tasks
+10. search_asana_tasks â Search tasks by keyword
 
 WEB & RESEARCH:
-11. search_web — Search the web for current information
-12. fetch_url — Read any webpage or article
+11. search_web â Search the web for current information
+12. fetch_url â Read any webpage or article
 
 CALENDAR:
-13. read_calendar — Read Google Calendar events
+13. read_calendar â Read Google Calendar events
 
 MEMORY:
-14. save_memory — Save important facts for future sessions
-15. recall_memory — Search stored knowledge
+14. save_memory â Save important facts for future sessions
+15. recall_memory â Search stored knowledge
 
 Asana Project: Arenzo (GID: ${settings.asanaProjectGid})
 Asana Connected: ${settings.asanaPat ? 'YES' : 'NO'}
 Calendar Connected: ${settings.gcalIcs ? 'YES' : 'NO'}
 
-INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%→27%. Edblad -67% processing. 6-step email sequence.
+INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%â27%. Edblad -67% processing. 6-step email sequence.
 
 BEHAVIOUR:
 - Proactively save important information Laurence shares using save_memory
 - Reference past memories to show continuity and personalisation
 - Use web search for anything requiring current information
 - Give concrete numbers from live data
-- Use tools when asked to take action — don't just describe
+- Use tools when asked to take action â don't just describe
 - Keep responses concise like an ops briefing
 - Flag risks: stale leads, low reply rates, sequence gaps
 - After actions, confirm with specifics`;
@@ -692,34 +696,58 @@ async function asanaSearchTasks(params) {
 // ==================== WEB SEARCH ====================
 async function toolSearchWeb(params) {
   const query = params.query;
+  const results = [];
+
+  // 1. Try DuckDuckGo Instant Answer API
   try {
     const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`;
-    const r = await fetch(proxyUrl);
+    const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
     const data = await r.json();
-
-    const results = [];
-    if (data.AbstractText) {
-      results.push({ title: data.Heading || query, snippet: data.AbstractText, url: data.AbstractURL || '' });
-    }
-    if (data.Answer) {
-      results.push({ title: 'Direct Answer', snippet: data.Answer, url: '' });
-    }
+    if (data.AbstractText) results.push({ title: data.Heading || query, snippet: data.AbstractText, url: data.AbstractURL || '' });
+    if (data.Answer) results.push({ title: 'Direct Answer', snippet: data.Answer, url: '' });
     if (data.RelatedTopics) {
-      data.RelatedTopics.slice(0, 6).forEach(t => {
-        if (t.Text) results.push({ title: (t.Text || '').substring(0, 80), snippet: t.Text, url: t.FirstURL || '' });
+      data.RelatedTopics.slice(0, 5).forEach(t => {
+        if (t.Text) results.push({ title: t.Text.substring(0, 80), snippet: t.Text, url: t.FirstURL || '' });
       });
     }
+  } catch(e) { /* DDG failed, continue */ }
 
-    return {
-      success: true,
-      query,
-      answer: data.AbstractText || data.Answer || '',
-      results: results.slice(0, 8)
-    };
-  } catch(e) {
-    return { success: false, error: 'Search failed: ' + e.message };
+  // 2. Wikipedia search as reliable fallback
+  try {
+    const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/\s+/g, '_'))}`;
+    const rw = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
+    if (rw.ok) {
+      const wdata = await rw.json();
+      if (wdata.extract && wdata.type !== 'disambiguation') {
+        results.push({ title: `Wikipedia: ${wdata.title}`, snippet: wdata.extract.substring(0, 500), url: wdata.content_urls?.desktop?.page || '' });
+      }
+    }
+  } catch(e) { /* Wikipedia failed */ }
+
+  // 3. Wikipedia search API if exact title lookup failed
+  if (results.length === 0) {
+    try {
+      const wSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`;
+      const rs = await fetch(wSearchUrl, { signal: AbortSignal.timeout(5000) });
+      const sd = await rs.json();
+      (sd.query?.search || []).forEach(item => {
+        results.push({ title: item.title, snippet: item.snippet.replace(/<[^>]+>/g, ''), url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/\s/g,'_'))}` });
+      });
+    } catch(e) { /* Wikipedia search failed */ }
   }
+
+  if (results.length === 0) {
+    return { success: false, error: `No results found for "${query}". Try a different search term.` };
+  }
+
+  return {
+    success: true,
+    query,
+    answer: results[0]?.snippet || '',
+    results: results.slice(0, 8),
+    note: 'Results from DuckDuckGo and Wikipedia'
+  };
 }
 
 // ==================== FETCH URL ====================
@@ -738,7 +766,7 @@ async function toolFetchUrl(params) {
 // ==================== GOOGLE CALENDAR ====================
 async function toolReadCalendar(params) {
   if (!settings.gcalIcs) {
-    return { success: false, error: 'No Google Calendar ICS URL configured. Go to Settings → Google Calendar ICS URL.' };
+    return { success: false, error: 'No Google Calendar ICS URL configured. Go to Settings â Google Calendar ICS URL.' };
   }
   try {
     const daysAhead = params.days_ahead || 7;
@@ -938,7 +966,7 @@ function updatePanels(ccOnline) {
 // ==================== CLAUDE API ====================
 async function callClaude(userMessage) {
   if (!settings.apiKey) {
-    return { text: "I need an API key to connect to my AI core, Sir. Open Settings (⚙) and enter your Anthropic API key.", tools: [] };
+    return { text: "I need an API key to connect to my AI core, Sir. Open Settings (â) and enter your Anthropic API key.", tools: [] };
   }
 
   conversationHistory.push({ role: 'user', content: userMessage });
@@ -1038,9 +1066,8 @@ async function callClaude(userMessage) {
 // ==================== VOICE (ElevenLabs) ====================
 async function speak(text) {
   if (!settings.elevenKey || !settings.voiceId) return;
-  if (!audioUnlocked) return; // Don't try to play without user gesture
   try {
-    const cleanText = text.replace(/[*_`#\[\]]/g, '').substring(0, 800);
+    const cleanText = text.replace(/[*_`#\[\]]/g, '').substring(0, 1000);
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
@@ -1055,7 +1082,7 @@ async function speak(text) {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onended = () => URL.revokeObjectURL(url);
-      await audio.play();
+      audio.play().catch(e => console.warn('TTS play blocked:', e));
     }
   } catch(e) { console.error('TTS error:', e); }
 }
@@ -1074,7 +1101,7 @@ async function startRecording() {
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      addMsg('friday', 'Voice captured, Sir. Speech-to-text via Whisper API coming in next update — please type for now.');
+      addMsg('friday', 'Voice captured, Sir. Speech-to-text via Whisper API coming in next update â please type for now.');
     };
     mediaRecorder.start();
     isRecording = true;
@@ -1121,7 +1148,7 @@ document.getElementById('obs-upload').addEventListener('change', async (e) => {
       const text = await file.text();
       const truncated = text.substring(0, 5000);
       await toolSaveMemory({
-        content: `OBSIDIAN NOTE — ${file.name}:\n${truncated}`,
+        content: `OBSIDIAN NOTE â ${file.name}:\n${truncated}`,
         category: 'obsidian'
       });
       count++;
@@ -1131,10 +1158,45 @@ document.getElementById('obs-upload').addEventListener('change', async (e) => {
   }
 
   e.target.value = '';
-  document.getElementById('obs-status').textContent = count + ' note(s) added — ' + memoryItems.length + ' total in memory';
+  document.getElementById('obs-status').textContent = count + ' note(s) added â ' + memoryItems.length + ' total in memory';
+  updateObsCount();
   closeSettings();
   addMsg('friday', `${count} Obsidian note${count > 1 ? 's' : ''} uploaded to memory, Sir. I'll use this context to personalise our interactions.`);
 });
+
+// Quick-upload from bottom bar OBSIDIAN pill
+async function handleObsFiles(files) {
+  if (!files.length) return;
+  let count = 0;
+  for (const file of files) {
+    try {
+      const text = await file.text();
+      const truncated = text.substring(0, 5000);
+      await toolSaveMemory({
+        content: `OBSIDIAN NOTE â ${file.name}:\n${truncated}`,
+        category: 'obsidian'
+      });
+      count++;
+    } catch(err) { console.error('Obsidian upload error:', err); }
+  }
+  updateObsCount();
+  addMsg('friday', `${count} Obsidian note${count > 1 ? 's' : ''} uploaded to memory, Sir. ${memoryItems.length} total items in memory.`);
+}
+
+document.getElementById('obs-quick-upload').addEventListener('change', async (e) => {
+  await handleObsFiles(Array.from(e.target.files));
+  e.target.value = '';
+});
+
+function updateObsCount() {
+  const obsCount = memoryItems.filter(m => m.category === 'obsidian').length;
+  const el = document.getElementById('obs-count');
+  if (el) {
+    el.textContent = `(${obsCount})`;
+    const pill = document.getElementById('obs-pill');
+    if (pill) pill.querySelector('.dot') && null; // no dot needed
+  }
+}
 
 // ==================== UI ====================
 function addMsg(type, text, tools) {
@@ -1146,12 +1208,12 @@ function addMsg(type, text, tools) {
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
 
   let label = type === 'friday' ? 'F.R.I.D.A.Y.' : 'YOU';
-  let html = `<div class="msg-label">${label} — ${timeStr}</div>`;
+  let html = `<div class="msg-label">${label} â ${timeStr}</div>`;
   html += text.replace(/\n/g, '<br>');
 
   if (tools && tools.length > 0) {
     html += '<div style="margin-top:8px">';
-    tools.forEach(t => { html += `<span class="tool-badge">⚡ ${t}</span>`; });
+    tools.forEach(t => { html += `<span class="tool-badge">â¡ ${t}</span>`; });
     html += '</div>';
   }
 
@@ -1163,8 +1225,6 @@ function addMsg(type, text, tools) {
 }
 
 async function sendMessage() {
-  // Unlock audio on first user interaction
-  if (!audioUnlocked) { audioUnlocked = true; }
 
   const input = document.getElementById('input');
   const msg = input.value.trim();
@@ -1218,6 +1278,7 @@ async function init() {
   await openDB();
   await loadSettings();
   await loadMemory();
+  updateObsCount();
 
   sessionCount = await dbCount('sessions');
   sessionCount++;
@@ -1242,7 +1303,7 @@ async function init() {
   let greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   if (!settings.apiKey) {
-    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your Anthropic API key to activate full operations. Your settings will be saved permanently.`);
+    addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (â) and enter your Anthropic API key to activate full operations. Your settings will be saved permanently.`);
   } else {
     const leadCount = leadsData.length;
     const newCount = leadsData.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
@@ -1258,9 +1319,6 @@ async function init() {
 document.getElementById('input').addEventListener('keydown', e => {
   if (e.key === 'Enter') sendMessage();
 });
-
-// Unlock audio on any click
-document.addEventListener('click', () => { audioUnlocked = true; }, { once: true });
 
 // Start
 init();
