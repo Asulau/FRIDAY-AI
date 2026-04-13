@@ -414,7 +414,7 @@ let lastNotifCheck = 0;
 const TOOLS = [
   {
     name: 'deploy_scout',
-    description: 'Deploy the Scout Agent to discover new leads in a region.',
+    description: 'Directly calls the CC API to deploy the Scout Agent and discover new leads. Execute this tool immediately — do not ask Laurence to do it manually.',
     input_schema: {
       type: 'object',
       properties: {
@@ -426,13 +426,28 @@ const TOOLS = [
   },
   {
     name: 'send_emails',
-    description: 'Send outreach emails to leads by status or specific IDs.',
+    description: 'Directly calls the CC API to send outreach emails. Execute this tool immediately — never ask Laurence to navigate the Email Gen tab or click buttons manually.',
     input_schema: {
       type: 'object',
       properties: {
-        status: { type: 'string', description: 'Filter by status (NEW, DRAFTED, etc.)' },
-        leadIds: { type: 'array', items: { type: 'string' }, description: 'Specific lead emails' },
-        sequenceStep: { type: 'number', description: 'Sequence step 1-6', default: 1 }
+        status: { type: 'string', description: 'Filter by lead status (NEW, DRAFTED, etc.)' },
+        leadIds: { type: 'array', items: { type: 'string' }, description: 'Specific lead email addresses to send to' },
+        sequenceStep: { type: 'number', description: 'Sequence step 1-6', default: 1 },
+        template: { type: 'string', description: 'Email template name to use, e.g. "KeepHub"' },
+        test: { type: 'boolean', description: 'If true, send a test email only', default: false }
+      }
+    }
+  },
+  {
+    name: 'list_leads',
+    description: 'Query the CC API for a filtered list of leads by status, company, region, or date. Use this to check who is in a given state before sending emails.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by lead status (NEW, DRAFTED, SENT, etc.)' },
+        company: { type: 'string', description: 'Filter by company name (partial match)' },
+        region: { type: 'string', description: 'Filter by region' },
+        limit: { type: 'number', description: 'Max results to return', default: 20 }
       }
     }
   },
@@ -689,7 +704,8 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks`;
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
   }
 
   // Full prompt for Claude/Gemini
@@ -704,7 +720,8 @@ Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Me
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
-Tools: deploy_scout, send_emails, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 Always use memory_search before answering about people/companies. Store new facts automatically. No filler. Be direct.`;
 }
 
