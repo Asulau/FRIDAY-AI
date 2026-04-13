@@ -27,7 +27,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 .clock-date{font-size:10px;color:var(--text);opacity:.6;text-align:center}
 .title{font-family:'Orbitron',sans-serif;font-size:20px;letter-spacing:8px;color:var(--cyan)}
 .header-btns{display:flex;gap:8px}
-.header-btn{Background:none;border:1px solid var(--border);color:var(--cyan);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
+.header-btn{background:none;border:1px solid var(--border);color:var(--cyan);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
 .header-btn:hover{background:var(--cyan-dim);border-color:var(--cyan)}
 /* CHAT */
 .chat-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
@@ -99,6 +99,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
     <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
     <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
+    <div class="stat-row"><span>Obsidian</span><span class="stat-val red" id="obsidian-status">NO KEY</span></div>
   </div>
   <div class="panel-box">
     <div class="panel-title">PIPELINE</div>
@@ -186,7 +187,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <input type="password" id="set-asana-pat" placeholder="1/12345...">
     </div>
     <div class="setting-group">
-      <label>ASANA PROJECT GID</label>
+      <label>ASAMA PROJECT GID</label>
       <input type="text" id="set-asana-project" placeholder="1213654696710519">
     </div>
     <div class="setting-group">
@@ -202,9 +203,18 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       </select>
     </div>
     <div class="setting-group">
+      <label>OBSIDIAN LOCAL REST API uRL (install plugin: obsidian-local-rest-api)</label>
+      <input type="text" id="set-obsidian-url" placeholder="https://localhost:27124">
+    </div>
+    <div class="setting-group">
+      <label>OBSIDIAJ API KEY (from plugin settings â API Key)</label>
+      <input type="password" id="set-obsidian-key" placeholder="Your Obsidian Local REST API key">
+      <div style="font-size:10px;color:#3a5060;margin-top:4px">â  First visit https://localhost:27124 in Chrome to trust the self-signed certificate, then connect.</div>
+    </div>
+    <div class="setting-group">
       <label>OBSIDIAN / KNOWLEDGE BASE (upload .md or .txt notes to build FRIDAY's memory)</label>
       <br>
-      <button class="obs-upload-btn" onclick="document.getElementById('obs-upload').click()">&#128448; UPLOAD NOTES</button>
+      <button class="obs-upload-btn" onclick="document.getElementById('obs-upload').click()">&#128448; UPLOAD NotES</button>
       <button class="mem-clear-btn" onclick="clearMemory()">&#x1F5D1; CLEAR MEMORY</button>
       <input type="file" id="obs-upload" style="display:none" accept=".md,.txt" multiple>
       <div style="font-size:10px;color:#3a5060;margin-top:6px" id="obs-status">No notes uploaded yet</div>
@@ -221,12 +231,14 @@ let db = null;
 let settings = {
   apiKey: '',
   ccUrl: 'https://leadfinder-rho.vercel.app',
-  elevenKey: '',
+  elevenKey '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
   model: 'claude-sonnet-4-6',
   asanaPat: '',
   asanaProjectGid: '1213654696710519',
-  gcalIcs: ''
+  gcalIcs: '',
+  obsidianUrl: 'https://localhost:27124',
+  obsidianKey: ''
 };
 let conversationHistory = [];
 let statsData = {};
@@ -238,7 +250,8 @@ let isRecording = false;
 let mediaRecorder = null;
 let memoryItems = []; // persistent knowledge base
 let calendarEvents = []; // cached calendar data
-// audioUnlocked removed â browser allows play() after any user interaction
+// AudioContext unlocked on first user click â survives async gaps (autoplay policy fix)
+let audioCtx = null;
 
 // ==================== TOOLS ====================
 const TOOLS = [
@@ -412,6 +425,41 @@ const TOOLS = [
       },
       required: ['query']
     }
+  },
+  {
+    name: 'search_obsidian',
+    description: 'Search notes in the Obsidian vault via Local REST API. Use when asked to find notes, recall vault knowledge, or look up anything in Obsidian.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search term to find in Obsidian notes' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'read_obsidian_note',
+    description: 'Read the full contents of a specific Obsidian note by path.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to the note, e.g. "Projects/Inretrn.md"' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'write_obsidian_note',
+    description: 'Create or update a note in the Obsidian vault. Use for saving summaries, action items, or any content the user wants stored in Obsidian.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path for the note, e.g. "FRIDAY/Notes.md"' },
+        content: { type: 'string', description: 'Markdown content to write' },
+        append: { type: 'boolean', description: 'If true, append to existing note. Default false (overwrite).', default: false }
+      },
+      required: ['path', 'content']
+    }
   }
 ];
 
@@ -478,9 +526,15 @@ MEMORY:
 14. save_memory â Save important facts for future sessions
 15. recall_memory â Search stored knowledge
 
+OBSIDIAN VAULT:
+16. search_obsidian â Search notes in Obsidian vault
+17. read_obsidian_note â Read a specific note by path
+18. write_obsidian_note â Create or update a note in Obsidian
+
 Asana Project: Arenzo (GID: ${settings.asanaProjectGid})
 Asana Connected: ${settings.asanaPat ? 'YES' : 'NO'}
 Calendar Connected: ${settings.gcalIcs ? 'YES' : 'NO'}
+Obsidian Connected: ${settings.obsidianKey ? 'YES' : 'NO'}
 
 INRETRN CONTEXT: Laurence is outreach partner for Inretrn, Nordic return management SaaS. Returns cost 20-45 EUR each. Stadium -80% costs. Nelly.com 38%â27%. Edblad -67% processing. 6-step email sequence.
 
@@ -589,6 +643,8 @@ async function loadSettings() {
   document.getElementById('set-asana-pat').value = settings.asanaPat || '';
   document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
   document.getElementById('set-gcal-ics').value = settings.gcalIcs || '';
+  document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'https://localhost:27124';
+  document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-6';
   if (memoryItems.length > 0) {
     document.getElementById('obs-status').textContent = memoryItems.length + ' items in memory';
@@ -603,6 +659,8 @@ async function saveSettings() {
   settings.asanaPat = document.getElementById('set-asana-pat').value.trim();
   settings.asanaProjectGid = document.getElementById('set-asana-project').value.trim() || '1213654696710519';
   settings.gcalIcs = document.getElementById('set-gcal-ics').value.trim();
+  settings.obsidianUrl = document.getElementById('set-obsidian-url').value.trim() || 'https://localhost:27124';
+  settings.obsidianKey = document.getElementById('set-obsidian-key').value.trim();
   settings.model = document.getElementById('set-model').value;
   await dbPut('settings', 'config', settings);
   closeSettings();
@@ -866,6 +924,66 @@ async function toolRecallMemory(params) {
   };
 }
 
+// ==================== OBSIDIAN LOCAL REST API ====================
+async function obsidianApi(method, path, body = null) {
+  const base = (settings.obsidianUrl || 'https://localhost:27124').replace(/\/$/, '');
+  const headers = { 'Authorization': `Bearer ${settings.obsidianKey}`, 'Content-Type': 'application/json' };
+  const opts = { method, headers };
+  if (body !== null) opts.body = typeof body === 'string' ? body : JSON.stringify(body);
+  const r = await fetch(`${base}${path}`, opts);
+  return r;
+}
+
+async function toolSearchObsidian(params) {
+  if (!settings.obsidianKey) return { success: false, error: 'No Obsidian API key configured. Go to Settings â Obsidian API Key.' };
+  try {
+    const r = await obsidianApi('POST', '/search/simple/', JSON.stringify({ query: params.query, contextLength: 200 }));
+    if (!r.ok) {
+      const txt = await r.text();
+      return { success: false, error: `Obsidian API error ${r.status}: ${txt.substring(0, 200)}` };
+    }
+    const results = await r.json();
+    if (!results.length) return { success: true, query: params.query, count: 0, results: [], note: 'No matching notes found.' };
+    return {
+      success: true, query: params.query, count: results.length,
+      results: results.slice(0, 8).map(r => ({ filename: r.filename, score: r.score, excerpt: r.context?.join('...') || '' })),
+      note: 'Results from your Obsidian vault'
+    };
+  } catch(e) {
+    return { success: false, error: `Could not reach Obsidian: ${e.message}. Make sure the Local REST API plugin is running and you have trusted the certificate at ${settings.obsidianUrl}.` };
+  }
+}
+
+async function toolReadObsidianNote(params) {
+  if (!settings.obsidianKey) return { success: false, error: 'No Obsidian API key configured.' };
+  try {
+    const encodedPath = encodeURIComponent(params.path);
+    const r = await obsidianApi('GET', `/vault/${encodedPath}`);
+    if (!r.ok) return { success: false, error: `Note not found: ${params.path} (${r.status})` };
+    const content = await r.text();
+    return { success: true, path: params.path, content: content.substring(0, 6000), length: content.length };
+  } catch(e) {
+    return { success: false, error: `Could not reach Obsidian: ${e.message}` };
+  }
+}
+
+async function toolWriteObsidianNote(params) {
+  if (!settings.obsidianKey) return { success: false, error: 'No Obsidian API key configured.' };
+  try {
+    const encodedPath = encodeURIComponent(params.path);
+    let content = params.content;
+    if (params.append) {
+      const existing = await obsidianApi('GET', `/vault/${encodedPath}`);
+      if (existing.ok) { const text = await existing.text(); content = text + '\n\n' + content; }
+    }
+    const r = await obsidianApi('PUT', `/vault/${encodedPath}`, content);
+    if (!r.ok) return { success: false, error: `Write failed: ${r.status}` };
+    return { success: true, path: params.path, action: params.append ? 'appended' : 'written', length: content.length };
+  } catch(e) {
+    return { success: false, error: `Could not reach Obsidian: ${e.message}` };
+  }
+}
+
 // ==================== EMAIL TEMPLATE ====================
 async function toolUpdateTemplate(params) {
   try {
@@ -895,6 +1013,9 @@ async function executeAction(name, params) {
   if (name === 'read_calendar') return toolReadCalendar(params);
   if (name === 'save_memory') return toolSaveMemory(params);
   if (name === 'recall_memory') return toolRecallMemory(params);
+  if (name === 'search_obsidian') return toolSearchObsidian(params);
+  if (name === 'read_obsidian_note') return toolReadObsidianNote(params);
+  if (name === 'write_obsidian_note') return toolWriteObsidianNote(params);
   if (name === 'update_email_template') return toolUpdateTemplate(params);
 
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
@@ -951,6 +1072,13 @@ function updatePanels(ccOnline) {
     document.getElementById('gcal-status').className = 'stat-val orange';
   }
 
+  const obsEl = document.getElementById('obsidian-status');
+  if (settings.obsidianKey) {
+    obsEl.textContent = 'CONFIGURED'; obsEl.className = 'stat-val orange';
+  } else {
+    obsEl.textContent = 'NO KEY'; obsEl.className = 'stat-val red';
+  }
+
   if (statsData.pipeline) {
     const p = statsData.pipeline;
     document.getElementById('pl-leads').textContent = p.totalLeads || 0;
@@ -963,7 +1091,7 @@ function updatePanels(ccOnline) {
   }
 }
 
-// ==================== CLAUDE API ====================
+// ==================== CLAUDE	API ====================
 async function callClaude(userMessage) {
   if (!settings.apiKey) {
     return { text: "I need an API key to connect to my AI core, Sir. Open Settings (â) and enter your Anthropic API key.", tools: [] };
@@ -1064,6 +1192,14 @@ async function callClaude(userMessage) {
 }
 
 // ==================== VOICE (ElevenLabs) ====================
+// Unlock AudioContext on every user click â once running, it survives async gaps
+document.addEventListener('click', () => {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+});
+
 async function speak(text) {
   if (!settings.elevenKey || !settings.voiceId) return;
   try {
@@ -1077,8 +1213,18 @@ async function speak(text) {
         voice_settings: { stability: 0.5, similarity_boost: 0.75 }
       })
     });
-    if (r.ok) {
-      const blob = await r.blob();
+    if (!r.ok) { console.error('TTS API error:', r.status); return; }
+    const blob = await r.blob();
+    // Prefer AudioContext (immune to autoplay policy after user click)
+    if (audioCtx && audioCtx.state === 'running') {
+      const arrayBuffer = await blob.arrayBuffer();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioCtx.destination);
+      source.start(0);
+    } else {
+      // Fallback: plain Audio element
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onended = () => URL.revokeObjectURL(url);
