@@ -713,6 +713,24 @@ const TOOLS = [
         company: { type: 'string', description: 'Company name to look up (partial match)' }
       }
     }
+  },
+  {
+    name: 'update_template',
+    description: 'Update an email sequence template step in the Command Center — change subject line, body prompt, or CTA for any of the 6 steps. Also update sender name, role, email, signature, or formatting rules. Use immediately when Laurence asks to change, edit, or update any template, step, subject, CTA, or signature.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        step: { type: 'number', description: 'Step number to update (1-6). Omit if updating sender/signature/formatting only.' },
+        subjectTemplate: { type: 'string', description: 'New subject line for this step. Use {{company}} and {{name}} as placeholders.' },
+        bodyPrompt: { type: 'string', description: 'New body prompt/instructions for AI email generation for this step.' },
+        cta: { type: 'string', description: 'New call-to-action text for this step.' },
+        senderName: { type: 'string', description: 'Update sender display name.' },
+        senderRole: { type: 'string', description: 'Update sender role/title shown in emails.' },
+        senderEmail: { type: 'string', description: 'Update sender email address.' },
+        signature: { type: 'string', description: 'Update the email signature block.' },
+        formattingRules: { type: 'string', description: 'Update the formatting rules/instructions for AI generation.' }
+      }
+    }
   }
 ];
 
@@ -733,7 +751,7 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
   }
 
@@ -749,7 +767,7 @@ Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Me
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 Always use memory_search before answering about people/companies. Store new facts automatically. No filler. Be direct.`;
 }
