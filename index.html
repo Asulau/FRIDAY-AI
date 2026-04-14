@@ -1970,7 +1970,7 @@ async function callAnthropic(userMessage) {
         },
         body: JSON.stringify({
           model: settings.model,
-          max_tokens: 4096,
+          max_tokens: 1024,
           system: buildSystemPrompt(),
           tools: TOOLS,
           messages: messages
