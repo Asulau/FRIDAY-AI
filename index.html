@@ -304,6 +304,23 @@ let settings = {
   notifInterval: 30
 };
 let conversationHistory = [];
+
+// Safe history slice: never start mid-tool-call (avoids orphaned tool_result 400 errors)
+function safeSlice(history, n) {
+  const sliced = history.slice(-n);
+  // Find first index that is a clean user text message (not tool_result)
+  let start = 0;
+  for (let i = 0; i < sliced.length; i++) {
+    const msg = sliced[i];
+    if (msg.role === 'user') {
+      const content = msg.content;
+      if (typeof content === 'string') { start = i; break; }
+      if (Array.isArray(content) && content[0]?.type !== 'tool_result') { start = i; break; }
+    }
+  }
+  return sliced.slice(start);
+}
+
 let statsData = {};
 let leadsData = [];
 let startTime = Date.now();
@@ -1733,7 +1750,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 async function callAnthropic(userMessage) {
   conversationHistory.push({ role: 'user', content: userMessage });
 
-  let messages = conversationHistory.slice(-12);
+  let messages = safeSlice(conversationHistory, 10);
   let response;
 
   try {
@@ -1784,15 +1801,18 @@ async function callAnthropic(userMessage) {
 
       // Truncate large tool results to keep input tokens low
       const resultStr = JSON.stringify(result);
+      // Aggressively cap memory reads to keep input tokens low
+      const isMem = block.name.startsWith('memory_');
+      const maxLen = isMem ? 800 : 2000;
       toolResults.push({
         type: 'tool_result',
         tool_use_id: block.id,
-        content: resultStr.length > 2000 ? resultStr.substring(0, 2000) + '...[truncated]' : resultStr
+        content: resultStr.length > maxLen ? resultStr.substring(0, maxLen) + '...[truncated]' : resultStr
       });
     }
 
     conversationHistory.push({ role: 'user', content: toolResults });
-    messages = conversationHistory.slice(-12);
+    messages = safeSlice(conversationHistory, 10);
 
     try {
       const resp2 = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
