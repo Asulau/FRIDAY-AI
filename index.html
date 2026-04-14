@@ -1087,7 +1087,7 @@ async function memoryStore(params) {
 }
 
 async function memorySearch(params) {
-  const results = await obsidianApi('/search/simple/', 'POST', params.query, 'text/plain');
+  const results = await obsidianApi('/search/simple/?query=' + encodeURIComponent(params.query), 'POST', null, 'application/json');
   // Filter to memory folder
   const folder = settings.obsidianFolder || 'FRIDAY/Memory';
   const filtered = (Array.isArray(results) ? results : []).filter(r =>
