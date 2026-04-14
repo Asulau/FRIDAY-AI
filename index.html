@@ -715,6 +715,27 @@ const TOOLS = [
     }
   },
   {
+    name: 'get_scout_config',
+    description: 'Get the current saved scout/scraping configuration from the Command Center — region, industries, personas, niches, and result limit. Always call this before deploy_scout so you know the current settings.',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'save_scout_config',
+    description: 'Save scraping parameters to the Command Center so they persist across sessions. Use whenever Laurence changes any scout setting: region, industries, personas, niches, or result limit. Always confirm what was saved.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        region: { type: 'string', description: 'Target region e.g. Benelux, DACH, Nordics' },
+        industries: { type: 'array', items: { type: 'string' }, description: 'Industries to target e.g. ["Retail","E-commerce","D2C"]' },
+        personas: { type: 'array', items: { type: 'string' }, description: 'Job seniority levels e.g. ["director","c-level","manager"]' },
+        niches: { type: 'array', items: { type: 'string' }, description: 'Specific niches e.g. ["apparel","footwear","beauty"]' },
+        max_results: { type: 'number', description: 'Max leads to fetch per scout run (default 50)' },
+        minRevenue: { type: 'string', description: 'Minimum company revenue e.g. 20000000' },
+        sector: { type: 'string', description: 'B2C or B2B' }
+      }
+    }
+  },
+  {
     name: 'update_template',
     description: 'Update an email sequence template step in the Command Center — change subject line, body prompt, or CTA for any of the 6 steps. Also update sender name, role, email, signature, or formatting rules. Use immediately when Laurence asks to change, edit, or update any template, step, subject, CTA, or signature.',
     input_schema: {
@@ -751,7 +772,7 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
   }
 
@@ -767,7 +788,7 @@ Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Me
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 Always use memory_search before answering about people/companies. Store new facts automatically. No filler. Be direct.`;
 }
