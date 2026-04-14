@@ -89,7 +89,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
   <div class="panel-box">
     <div class="panel-title">CONNECTORS</div>
     <div class="stat-row"><span>Command Center</span><span class="stat-val" id="cc-status">--</span></div>
-    <div class="stat-row"><span>Asana</span><span class="stat-val red" id="asana-status">OFFLINE</span></div>
+    
     <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
     <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
     <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
@@ -138,7 +138,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 
   <div class="bottom-bar">
     <div class="connector-pill"><span class="dot" id="dot-cc"></span>CMD CENTER</div>
-    <div class="connector-pill"><span class="dot" id="dot-asana"></span>ASANA</div>
+    
     <div class="connector-pill"><span class="dot" id="dot-gcal"></span>GCAL</div>
     <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
     <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
@@ -481,68 +481,6 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} }
   },
   {
-    name: 'create_asana_task',
-    description: 'Create a new task in Asana. Use this when asked to add a task, todo, action item, or reminder.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'Task title' },
-        notes: { type: 'string', description: 'Task description/details' },
-        due_on: { type: 'string', description: 'Due date in YYYY-MM-DD format' },
-        assignee: { type: 'string', description: 'Assignee email or "me"', default: 'me' }
-      },
-      required: ['name']
-    }
-  },
-  {
-    name: 'list_asana_tasks',
-    description: 'List tasks from Asana project. Use when asked about tasks, todos, what needs doing, or task status.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        completed: { type: 'boolean', description: 'If true show completed, if false show incomplete. Default false.', default: false }
-      }
-    }
-  },
-  {
-    name: 'update_asana_task',
-    description: 'Update an existing Asana task ÃÂ¢ÃÂÃÂ mark complete, change due date, rename, add notes.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        task_gid: { type: 'string', description: 'The Asana task GID to update' },
-        name: { type: 'string', description: 'New task name' },
-        notes: { type: 'string', description: 'New description' },
-        due_on: { type: 'string', description: 'New due date YYYY-MM-DD or null to clear' },
-        completed: { type: 'boolean', description: 'Mark complete (true) or incomplete (false)' }
-      },
-      required: ['task_gid']
-    }
-  },
-  {
-    name: 'search_asana_tasks',
-    description: 'Search for Asana tasks by keyword in name or description.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search text to find in task names/descriptions' }
-      },
-      required: ['query']
-    }
-  },
-  // Gmail tools
-  {
-    name: 'list_gmail',
-    description: 'List recent emails from Gmail inbox. Use when asked about emails, inbox, or messages.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        maxResults: { type: 'number', description: 'Number of emails to fetch (max 20)', default: 10 },
-        query: { type: 'string', description: 'Gmail search query (e.g. "is:unread", "from:boss@co.com", "subject:invoice")' }
-      }
-    }
-  },
-  {
     name: 'read_gmail',
     description: 'Read a specific Gmail email by ID. Use to get the full body of an email.',
     input_schema: {
@@ -674,17 +612,6 @@ const TOOLS = [
       properties: {}
     }
   },
-  // Notification tool
-  {
-    name: 'check_important_tasks',
-    description: 'Check for overdue or high-priority tasks and trigger notifications. Use when asked to check deadlines or important items.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        includeToday: { type: 'boolean', description: 'Include tasks due today', default: true }
-      }
-    }
-  },
   {
     name: 'get_templates',
     description: 'Get the active email sequence templates and signature from the Command Center. Use immediately when asked about templates, steps, subject lines, CTAs, signature, or email content. Never say you cannot see templates — call this tool.',
@@ -772,7 +699,7 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
   }
 
@@ -788,7 +715,7 @@ Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Me
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, create_asana_task, list_asana_tasks, update_asana_task, search_asana_tasks, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, check_important_tasks
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 Always use memory_search before answering about people/companies. Store new facts automatically. No filler. Be direct.`;
 }
@@ -984,65 +911,10 @@ async function fetchLeads() {
 }
 
 // ==================== ASANA API ====================
-async function asanaApi(path, method = 'GET', body = null) {
-  const opts = {
-    method,
-    headers: {
-      'Authorization': 'Bearer ' + settings.asanaPat,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  };
-  if (body) opts.body = JSON.stringify({ data: body });
-  const r = await fetch('https://app.asana.com/api/1.0' + path, opts);
-  const json = await r.json();
-  if (json.errors) throw new Error(json.errors.map(e => e.message).join(', '));
-  return json.data;
-}
 
-async function asanaCreateTask(params) {
-  const body = {
-    name: params.name,
-    projects: [settings.asanaProjectGid],
-    workspace: '1213677620858514'
-  };
-  if (params.notes) body.notes = params.notes;
-  if (params.due_on) body.due_on = params.due_on;
-  if (params.assignee) body.assignee = params.assignee === 'me' ? 'me' : params.assignee;
-  const task = await asanaApi('/tasks', 'POST', body);
-  return { success: true, task: { gid: task.gid, name: task.name, due_on: task.due_on, permalink_url: task.permalink_url } };
-}
 
-async function asanaListTasks(params) {
-  const completed = params.completed === true;
-  const fields = 'name,completed,due_on,assignee.name,notes';
-  const tasks = await asanaApi(`/projects/${settings.asanaProjectGid}/tasks?completed_since=${completed ? '' : 'now'}&opt_fields=${fields}`);
-  const filtered = completed ? tasks : tasks.filter(t => !t.completed);
-  return { success: true, count: filtered.length, tasks: filtered.map(t => ({
-    gid: t.gid, name: t.name, completed: t.completed,
-    due_on: t.due_on, assignee: t.assignee ? t.assignee.name : 'Unassigned',
-    notes: (t.notes || '').substring(0, 100)
-  }))};
-}
 
-async function asanaUpdateTask(params) {
-  const body = {};
-  if (params.name !== undefined) body.name = params.name;
-  if (params.notes !== undefined) body.notes = params.notes;
-  if (params.due_on !== undefined) body.due_on = params.due_on;
-  if (params.completed !== undefined) body.completed = params.completed;
-  const task = await asanaApi(`/tasks/${params.task_gid}`, 'PUT', body);
-  return { success: true, task: { gid: task.gid, name: task.name, completed: task.completed, due_on: task.due_on } };
-}
 
-async function asanaSearchTasks(params) {
-  const fields = 'name,completed,due_on,assignee.name';
-  const tasks = await asanaApi(`/workspaces/1213677620858514/tasks/search?text=${encodeURIComponent(params.query)}&opt_fields=${fields}`);
-  return { success: true, count: tasks.length, tasks: tasks.map(t => ({
-    gid: t.gid, name: t.name, completed: t.completed,
-    due_on: t.due_on, assignee: t.assignee ? t.assignee.name : 'Unassigned'
-  }))};
-}
 
 // ==================== OBSIDIAN MEMORY BANK ====================
 async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
@@ -1407,59 +1279,6 @@ function showNotification(title, body, tag) {
   setTimeout(() => n.close(), 15000);
 }
 
-async function checkImportantTasks(params = {}) {
-  if (!settings.asanaPat) return { success: false, error: 'Asana not configured' };
-
-  const includeToday = params.includeToday !== false;
-  const fields = 'name,completed,due_on,assignee.name';
-  const tasks = await asanaApi(`/projects/${settings.asanaProjectGid}/tasks?completed_since=now&opt_fields=${fields}`);
-  const incomplete = tasks.filter(t => !t.completed);
-
-  const today = new Date().toISOString().split('T')[0];
-  const overdue = [];
-  const dueToday = [];
-  const upcoming = [];
-
-  for (const t of incomplete) {
-    if (!t.due_on) continue;
-    if (t.due_on < today) {
-      overdue.push(t);
-    } else if (t.due_on === today && includeToday) {
-      dueToday.push(t);
-    } else if (t.due_on <= new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]) {
-      upcoming.push(t);
-    }
-  }
-
-  // Send browser notifications for overdue and due today
-  const hasPermission = await requestNotifPermission();
-  if (hasPermission) {
-    if (overdue.length > 0) {
-      showNotification(
-        `ÃÂ¢ÃÂÃÂ ÃÂ¯ÃÂ¸ÃÂ ${overdue.length} Overdue Task${overdue.length > 1 ? 's' : ''}`,
-        overdue.map(t => `ÃÂ¢ÃÂÃÂ¢ ${t.name} (due ${t.due_on})`).join('\n'),
-        'friday-overdue'
-      );
-    }
-    if (dueToday.length > 0) {
-      showNotification(
-        `ÃÂ°ÃÂÃÂÃÂ ${dueToday.length} Task${dueToday.length > 1 ? 's' : ''} Due Today`,
-        dueToday.map(t => `ÃÂ¢ÃÂÃÂ¢ ${t.name}`).join('\n'),
-        'friday-today'
-      );
-    }
-  }
-
-  // Also post to chat if called manually
-  return {
-    success: true,
-    overdue: overdue.map(t => ({ gid: t.gid, name: t.name, due_on: t.due_on })),
-    dueToday: dueToday.map(t => ({ gid: t.gid, name: t.name, due_on: t.due_on })),
-    upcoming: upcoming.map(t => ({ gid: t.gid, name: t.name, due_on: t.due_on })),
-    notificationsEnabled: hasPermission,
-    summary: `${overdue.length} overdue, ${dueToday.length} due today, ${upcoming.length} due within 3 days`
-  };
-}
 
 function startNotificationLoop() {
   if (notifTimer) clearInterval(notifTimer);
@@ -1492,10 +1311,6 @@ function startNotificationLoop() {
 
 async function executeAction(name, params) {
   // Route Asana tools
-  if (name === 'create_asana_task') return asanaCreateTask(params);
-  if (name === 'list_asana_tasks') return asanaListTasks(params);
-  if (name === 'update_asana_task') return asanaUpdateTask(params);
-  if (name === 'search_asana_tasks') return asanaSearchTasks(params);
 
   // Route Obsidian memory tools
   if (name === 'memory_store') return memoryStore(params);
@@ -1518,7 +1333,6 @@ async function executeAction(name, params) {
   if (name === 'send_outlook') return outlookSend(params);
 
   // Route Notification tools
-  if (name === 'check_important_tasks') return checkImportantTasks(params);
 
   // Command Center tools
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
@@ -1548,8 +1362,6 @@ function updatePanels(ccOnline) {
   }
 
   // Asana status
-  const asanaEl = document.getElementById('asana-status');
-  const dotAsana = document.getElementById('dot-asana');
   if (settings.asanaPat) {
     asanaEl.textContent = 'ONLINE'; asanaEl.className = 'stat-val green';
     dotAsana.className = 'dot online';
@@ -2033,6 +1845,14 @@ function _getAudioCtx() {
   const ctx = _getAudioCtx();
   if (ctx.state === 'suspended') ctx.resume();
 }));
+
+
+// Unlock AudioContext on first user gesture
+document.addEventListener('click', function unlockAudio() {
+  if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
+  else if (!_audioCtx) { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+  document.removeEventListener('click', unlockAudio);
+}, { once: true });
 
 async function speak(text) {
   if (!settings.elevenKey || !settings.voiceId) return;
