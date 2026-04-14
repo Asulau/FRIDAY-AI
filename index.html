@@ -37,7 +37,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
 .msg.user{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #1a3050;align-self:flex-end;color:#e0e0e0}
 .msg.user .msg-label{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--orange);letter-spacing:3px;margin-bottom:6px;opacity:.6;text-align:right}
 .msg.error{border-color:var(--red);background:#1a0a0f}
-.msg .tool-badge{display:inline-block;background:var(--purple);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;margin:4px 2px;font-family:'Orbitron',sans-serif}
+.msg .tool-badge{display:none}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 /* INPUT */
 .input-area{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center}
@@ -1900,7 +1900,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 async function callAnthropic(userMessage) {
   conversationHistory.push({ role: 'user', content: userMessage });
 
-  let messages = conversationHistory.slice(-30);
+  let messages = conversationHistory.slice(-12);
   let response;
 
   try {
@@ -1949,15 +1949,17 @@ async function callAnthropic(userMessage) {
         result = { success: false, error: e.message };
       }
 
+      // Truncate large tool results to keep input tokens low
+      const resultStr = JSON.stringify(result);
       toolResults.push({
         type: 'tool_result',
         tool_use_id: block.id,
-        content: JSON.stringify(result)
+        content: resultStr.length > 2000 ? resultStr.substring(0, 2000) + '...[truncated]' : resultStr
       });
     }
 
     conversationHistory.push({ role: 'user', content: toolResults });
-    messages = conversationHistory.slice(-30);
+    messages = conversationHistory.slice(-12);
 
     try {
       const resp2 = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
