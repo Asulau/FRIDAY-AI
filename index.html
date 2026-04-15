@@ -689,6 +689,17 @@ const TOOLS = [
     }
   },
   {
+    name: 'send_next_step',
+    description: 'Send the next sequence step to all leads that are due for a follow-up (4+ business days since last email). Automatically detects which step each lead needs next — never repeats a step. Use this for scheduled follow-ups.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        businessDays: { type: 'number', description: 'Minimum business days since last email before sending follow-up (default: 4)' },
+        dryRun: { type: 'boolean', description: 'If true, shows which leads are due without sending. Use to preview before sending.' }
+      }
+    }
+  },
+  {
     name: 'update_template',
     description: 'Update an email sequence template step in the Command Center — change subject line, body prompt, or CTA for any of the 6 steps. Also update sender name, role, email, signature, or formatting rules. Use immediately when Laurence asks to change, edit, or update any template, step, subject, CTA, or signature.',
     input_schema: {
