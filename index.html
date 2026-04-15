@@ -458,6 +458,7 @@ const TOOLS = [
         status: { type: 'string', description: 'Filter by lead status (NEW, DRAFTED, etc.)' },
         leadIds: { type: 'array', items: { type: 'string' }, description: 'Specific lead email addresses to send to' },
         sequenceStep: { type: 'number', description: 'Sequence step 1-6', default: 1 },
+        limit: { type: 'number', description: 'REQUIRED: Max emails to send in this batch. Always set to exactly what Laurence asked for. Never send more. Default 10 if not specified.' },
         limit: { type: 'number', description: 'REQUIRED: Maximum number of emails to send. Always set this to exactly what Laurence asked for. Default 10.' },
         template: { type: 'string', description: 'Email template name to use, e.g. "KeepHub"' },
         test: { type: 'boolean', description: 'If true, send a test email only', default: false }
