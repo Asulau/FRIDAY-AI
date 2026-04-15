@@ -451,13 +451,14 @@ const TOOLS = [
   },
   {
     name: 'send_emails',
-    description: 'Directly calls the CC API to send outreach emails. Execute this tool immediately — never ask Laurence to navigate the Email Gen tab or click buttons manually.',
+    description: 'Send outreach emails via the CC. ALWAYS include a limit parameter matching exactly what Laurence asked for. Never send more than requested. Default limit is 10 if not specified.',
     input_schema: {
       type: 'object',
       properties: {
         status: { type: 'string', description: 'Filter by lead status (NEW, DRAFTED, etc.)' },
         leadIds: { type: 'array', items: { type: 'string' }, description: 'Specific lead email addresses to send to' },
         sequenceStep: { type: 'number', description: 'Sequence step 1-6', default: 1 },
+        limit: { type: 'number', description: 'REQUIRED: Maximum number of emails to send. Always set this to exactly what Laurence asked for. Default 10.' },
         template: { type: 'string', description: 'Email template name to use, e.g. "KeepHub"' },
         test: { type: 'boolean', description: 'If true, send a test email only', default: false }
       }
