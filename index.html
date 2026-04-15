@@ -754,7 +754,7 @@ ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''
 Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
-Always use memory_search before answering about people/companies. Store new facts automatically. No filler. Be direct.`;
+MEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions. Before answering ANY question about a company, person, or strategy — search memory first. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
 }
 
 // ==================== IndexedDB ====================
