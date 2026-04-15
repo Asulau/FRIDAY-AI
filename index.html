@@ -608,6 +608,18 @@ const TOOLS = [
   },
   // Obsidian memory tools
   {
+    name: 'memory_traverse',
+    description: 'Navigate the Obsidian knowledge graph by reading a note and following its [[wikilinks]] to connected notes. Use this to explore relationships — e.g. read a company note then follow links to its sector, contacts, and campaign context. Much more powerful than keyword search for understanding connections.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Full path to the note e.g. "FRIDAY/Graph/Company — Elkjøp.md"' },
+        followFirst: { type: 'boolean', description: 'If true, also read the first linked note automatically', default: false }
+      },
+      required: ['path']
+    }
+  },
+  {
     name: 'memory_store',
     description: 'Save information to the Obsidian memory bank. Use to remember facts, contact details, preferences, meeting notes, or any context that should persist across sessions.',
     input_schema: {
@@ -783,7 +795,7 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
   }
 
@@ -799,11 +811,11 @@ Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Me
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 KeepHub: Frontline employee optimisation platform. Streamline operations, improve customer experience, boost frontline efficiency. 6-step outreach.
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 INSTRUCTION RULE: Read every message carefully before acting. If Laurence says "send emails" — call send_emails, do NOT deploy_scout. If Laurence says "send to 5 leads" — send to exactly 5, not more, not fewer. If Laurence asks a question — answer it, do not take action. Never assume what Laurence wants — do exactly what is written. When in doubt, confirm before acting. Explicit chat instructions override everything.
 EMAIL TRACKING RULE: After EVERY send_emails or send_next_step call — immediately: (1) Show Laurence a summary table of what was sent: | Company | Email | Step | Subject |, (2) call memory_store with title="Send Log [date]" listing each recipient. Format clearly and concisely. This is mandatory — never skip it. If 0 emails sent, explain why.
-MEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions from the vault. Before sending any emails, search memory for recent send logs to avoid duplicates. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
+MEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions from the vault. Before sending any emails, search memory for recent send logs to avoid duplicates. Use memory_traverse to follow connections between companies, sectors and KeepHub context for richer understanding. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
 }
 
 // ==================== IndexedDB ====================
@@ -1089,6 +1101,25 @@ async function memorySearch(params) {
 async function memoryRead(params) {
   const data = await obsidianApi(`/vault/${encodeURIComponent(params.path)}`, 'GET');
   return { success: true, path: params.path, content: (data.content || '').substring(0, 5000) };
+}
+
+async function memoryTraverse(params) {
+  // Read a note and extract all [[wikilinks]] — enables graph traversal
+  const data = await obsidianApi('/vault/' + encodeURIComponent(params.path), 'GET');
+  const content = data.content || '';
+  // Extract [[wikilinks]]
+  const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
+  // Also extract backlinks if requested
+  const result = { path: params.path, content: content.substring(0, 1500), links, linkCount: links.length };
+  if (params.followFirst && links.length > 0) {
+    // Follow the first link automatically
+    const firstPath = 'FRIDAY/Graph/' + links[0] + '.md';
+    try {
+      const linked = await obsidianApi('/vault/' + encodeURIComponent(firstPath), 'GET');
+      result.linkedNote = { path: firstPath, content: (linked.content || '').substring(0, 800) };
+    } catch(e) {}
+  }
+  return result;
 }
 
 async function memoryList() {
@@ -1403,6 +1434,7 @@ async function executeAction(name, params) {
   if (name === 'memory_search') return memorySearch(params);
   if (name === 'memory_read') return memoryRead(params);
   if (name === 'memory_list') return memoryList();
+  if (name === 'memory_traverse') return memoryTraverse(params);
 
   // Route Web tools
   if (name === 'web_search') return webSearch(params);
