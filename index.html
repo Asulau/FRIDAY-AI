@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// Auto-redirect preview URLs to production
+(function() {
+  const host = window.location.hostname;
+  const prod = 'friday-ai-theta.vercel.app';
+  if (host !== prod && host !== 'localhost' && host !== '127.0.0.1' && host.endsWith('.vercel.app')) {
+    window.location.replace('https://' + prod + window.location.pathname + window.location.search);
+  }
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F.R.I.D.A.Y. ÃÂ¢ÃÂÃÂ Personal AI Assistant</title>
