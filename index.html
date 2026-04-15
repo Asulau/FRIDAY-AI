@@ -734,7 +734,7 @@ function buildSystemPrompt() {
 
 Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v).join(', ')}
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
-Context: Inretrn Nordic SaaS outreach partner. Returns cost 20-45 EUR. 6-step email sequence.
+Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
@@ -751,10 +751,11 @@ Recent: ${JSON.stringify(recentLeads)}
 Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Memory:${settings.obsidianKey?'LIVE ('+settings.obsidianFolder+')':'OFF'} Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
-Inretrn: Nordic return management SaaS, returns 20-45 EUR, 6-step outreach.
+KeepHub: Frontline employee optimisation platform. Streamline operations, improve customer experience, boost frontline efficiency. 6-step outreach.
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
-MEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions. Before answering ANY question about a company, person, or strategy — search memory first. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
+INSTRUCTION RULE: When Laurence gives an explicit instruction in the chat (e.g. "focus only on X", "don't mention Y", "use this template"), follow it exactly and immediately. Do not say "understood" and then proceed differently. Do not override explicit instructions with prior context or memory. Explicit chat instructions always override defaults.
+MEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions from the vault. Before answering ANY question about a company, person, or strategy — search memory first. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
 }
 
 // ==================== IndexedDB ====================
