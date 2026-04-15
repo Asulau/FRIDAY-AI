@@ -108,7 +108,8 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
   <div class="panel-box">
     <div class="panel-title">PIPELINE</div>
     <div class="stat-row"><span>LEADS</span><span class="stat-val" id="pl-leads">--</span></div>
-    <div class="stat-row"><span>NEW</span><span class="stat-val" id="pl-new">--</span></div>
+    <div class="stat-row"><span>NEW</span><span class="stat-val green" id="pl-new">--</span></div>
+    <div class="stat-row"><span>HOLD</span><span class="stat-val orange" id="pl-hold">--</span></div>
     <div class="stat-row"><span>SENT</span><span class="stat-val" id="pl-sent">--</span></div>
     <div class="stat-row"><span>REPLIED</span><span class="stat-val" id="pl-replied">--</span></div>
     <div class="stat-row"><span>REPLY RATE</span><span class="stat-val" id="pl-rate">--</span></div>
@@ -162,7 +163,7 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
     <div class="setting-group">
       <label>AI PROVIDER</label>
       <select id="set-provider" onchange="toggleProviderFields()">
-        <option value="groq">Groq ÃÂ¢ÃÂÃÂ Llama 3.3 (TRULY FREE ÃÂ¢ÃÂÃÂ)</option>
+
         <option value="gemini">Google Gemini (Free tier)</option>
         <option value="anthropic">Anthropic Claude (Paid)</option>
       </select>
@@ -289,12 +290,10 @@ const DB_NAME = 'FRIDAY_DB';
 const DB_VERSION = 2;
 let db = null;
 let settings = {
-  provider: 'groq',
+  provider: 'anthropic',
   apiKey: '',
   geminiKey: '',
   geminiModel: 'gemini-2.0-flash',
-  groqKey: '',
-  groqModel: 'llama-3.3-70b-versatile',
   ccUrl: 'https://leadfinder-rho.vercel.app',
   elevenKey: '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
@@ -822,7 +821,7 @@ async function loadSettings() {
     // Sync to both storage backends
     persistSettings();
   }
-  document.getElementById('set-provider').value = settings.provider || 'groq';
+  document.getElementById('set-provider').value = settings.provider || 'anthropic';
   document.getElementById('set-groq-key').value = settings.groqKey || '';
   document.getElementById('set-groq-model').value = settings.groqModel || 'llama-3.3-70b-versatile';
   document.getElementById('set-gemini-key').value = settings.geminiKey || '';
@@ -912,7 +911,7 @@ let _autoSaveInitialized = false;
 function initAutoSave() {
   if (_autoSaveInitialized) return; // Only run once ÃÂ¢ÃÂÃÂ prevents stacking listeners on re-init
   _autoSaveInitialized = true;
-  const ids = ['set-provider','set-groq-key','set-groq-model','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
+  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -1475,6 +1474,7 @@ function updatePanels(ccOnline) {
     const p = statsData.pipeline;
     document.getElementById('pl-leads').textContent = p.totalLeads || 0;
     document.getElementById('pl-new').textContent = (p.byStatus || {}).NEW || 0;
+    const holdEl = document.getElementById('pl-hold'); if(holdEl) holdEl.textContent = (p.byStatus || {}).HOLD || 0;
     document.getElementById('pl-sent').textContent = (p.byStatus || {}).SENT || 0;
     document.getElementById('pl-replied').textContent = (p.byStatus || {}).REPLIED || 0;
   }
