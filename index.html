@@ -1993,37 +1993,11 @@ document.addEventListener('click', function unlockAudio() {
   document.removeEventListener('click', unlockAudio);
 }, { once: true });
 
-// Kokoro TTS — free, runs in browser, no API key needed
-let kokoroTTS = null;
-(async () => {
-  try {
-    const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.2/dist/kokoro.web.js');
-    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0', { dtype: 'q8' });
-    console.log('[FRIDAY] Kokoro TTS ready');
-  } catch(e) { console.warn('[FRIDAY] Kokoro load failed, ElevenLabs fallback active:', e); }
-})();
-
 async function speak(text) {
-  const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
-  if (!cleanText) return;
-
-  // PRIMARY: Kokoro TTS (free, in-browser, voice: bf_lily)
-  if (kokoroTTS) {
-    try {
-      const audio = await kokoroTTS.generate(cleanText, { voice: 'bf_lily' });
-      const blob = audio.toBlob('audio/wav');
-      const url = URL.createObjectURL(blob);
-      const a = new Audio(url);
-      orbState = 'speaking';
-      a.onended = () => { orbState = 'idle'; URL.revokeObjectURL(url); };
-      a.play();
-      return;
-    } catch(e) { console.warn('[FRIDAY] Kokoro speak failed, trying ElevenLabs:', e); }
-  }
-
-  // FALLBACK: ElevenLabs
   if (!settings.elevenKey || !settings.voiceId) return;
   try {
+    const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
+    if (!cleanText) return;
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
@@ -2050,7 +2024,6 @@ async function speak(text) {
   } catch(e) { console.error('TTS error:', e); }
 }
 
-// ==================== VOICE INPUT ====================
 function toggleMic() {
   if (isRecording) { stopRecording(); }
   else { startRecording(); }
