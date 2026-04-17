@@ -2024,6 +2024,36 @@ async function speak(text) {
   } catch(e) { console.error('TTS error:', e); }
 }
 
+// ==================== KOKORO TTS ====================
+// Primary voice: bf_lily (British female) | Fallback: ElevenLabs
+let kokoroTTS = null;
+const _originalSpeak = speak;
+(async () => {
+  try {
+    const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.2/dist/kokoro.web.js');
+    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0', { dtype: 'q8' });
+    console.log('[FRIDAY] Kokoro TTS ready (bf_lily)');
+  } catch(e) { console.warn('[FRIDAY] Kokoro failed to load, falling back to ElevenLabs:', e); }
+})();
+
+speak = async function(text) {
+  const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
+  if (!cleanText) return;
+  if (kokoroTTS) {
+    try {
+      const audio = await kokoroTTS.generate(cleanText, { voice: 'bf_lily' });
+      const blob = audio.toBlob('audio/wav');
+      const url = URL.createObjectURL(blob);
+      const a = new Audio(url);
+      orbState = 'speaking';
+      a.onended = () => { orbState = 'idle'; URL.revokeObjectURL(url); };
+      a.play();
+      return;
+    } catch(e) { console.warn('[FRIDAY] Kokoro error, using ElevenLabs:', e); }
+  }
+  return _originalSpeak(text);
+};
+
 function toggleMic() {
   if (isRecording) { stopRecording(); }
   else { startRecording(); }
