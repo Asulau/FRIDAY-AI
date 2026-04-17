@@ -450,7 +450,7 @@ let lastNotifCheck = 0;
 const TOOLS = [
   {
     name: 'deploy_scout',
-    description: 'Directly calls the CC API to deploy the Scout Agent and discover new leads. Execute this tool immediately — do not ask Laurence to do it manually.',
+    description: 'Search for and import BRAND NEW leads from the web. ONLY use this when Laurence explicitly asks to find new leads, run scout, or the pipeline is empty. NEVER use this when Laurence says activate HOLD leads, send to existing contacts, or move leads to new — use activate_leads instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -781,6 +781,18 @@ const TOOLS = [
       }
     }
   }
+  {
+    name: 'activate_leads',
+    description: 'Activate existing leads by changing their status. Use this to move HOLD leads to NEW so they can be emailed. Always use this instead of deploy_scout when Laurence wants to send to existing HOLD contacts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromStatus: { type: 'string', description: 'Source status to activate from (default: HOLD)', default: 'HOLD' },
+        toStatus: { type: 'string', description: 'Target status (default: NEW)', default: 'NEW' },
+        limit: { type: 'number', description: 'Max leads to activate', default: 50 }
+      }
+    }
+  },
 ];
 
 // ==================== SYSTEM PROMPT ====================
@@ -801,7 +813,7 @@ Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse
-RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.`;
+RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).`;
   }
 
   // Full prompt for Claude/Gemini
@@ -820,7 +832,7 @@ Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refr
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 INSTRUCTION RULE: Read every message carefully before acting. Before ANY email send — always call get_send_limits first. If status is WARNING or STOP, inform Laurence and do not send. If Laurence says "send emails" — call send_emails, do NOT deploy_scout. If Laurence says "send to 5 leads" — send to exactly 5, not more, not fewer. If Laurence asks a question — answer it, do not take action. Never assume what Laurence wants — do exactly what is written. When in doubt, confirm before acting. Explicit chat instructions override everything.
 EMAIL TRACKING RULE: After EVERY send_emails or send_next_step call — immediately: (1) Show Laurence a summary table of what was sent: | Company | Email | Step | Subject |, (2) call memory_store with title="Send Log [date]" listing each recipient. Format clearly and concisely. This is mandatory — never skip it. If 0 emails sent, explain why.
-MEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions from the vault. Before sending any emails, search memory for recent send logs to avoid duplicates. Use memory_traverse to follow connections between companies, sectors and KeepHub context for richer understanding. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
+HOLD LEAD ACTIVATION RULE: When Laurence mentions 'HOLD leads', 'activate leads', 'leads on hold', or wants to send to existing contacts — NEVER call deploy_scout. HOLD leads are pre-imported contacts ready to work. Correct workflow: (1) call activate_leads({fromStatus:'HOLD', toStatus:'NEW', limit:N}) to convert them, (2) call send_emails({limit:N}) to send Template 1. deploy_scout is ONLY for finding brand new contacts when the pipeline is empty or Laurence explicitly says 'find new leads' or 'run scout'.\nMEMORY RULES: Always call memory_search at the start of every conversation to load context and instructions from the vault. Before sending any emails, search memory for recent send logs to avoid duplicates. Use memory_traverse to follow connections between companies, sectors and KeepHub context for richer understanding. After learning something new (company info, preferences, instructions) — store it with memory_store immediately. The vault contains your operating instructions — check it before acting.`; 
 }
 
 // ==================== IndexedDB ====================
