@@ -787,6 +787,7 @@ body::after {
     <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
     <div class="stat-row"><span>Web Search</span><span class="stat-val red" id="web-status">OFFLINE</span></div>
     <div class="stat-row"><span>Obsidian</span><span class="stat-val red" id="obsidian-status">OFFLINE</span></div>
+    <div class="stat-row"><span>SalesHub</span><span class="stat-val orange" id="saleshub-status">--</span></div>
   </div>
   <div class="panel-box">
     <div class="panel-title">Pipeline</div>
@@ -842,6 +843,7 @@ body::after {
     <div class="connector-pill"><span class="dot" id="dot-gcal"></span>GCAL</div>
     <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
     <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
+    <div class="connector-pill"><span class="dot" id="dot-saleshub"></span>SALESHUB</div>
   </div>
 </div>
 
@@ -986,6 +988,12 @@ body::after {
     <div class="setting-group">
       <label>Check Interval (Minutes)</label>
       <input type="number" id="set-notif-interval" placeholder="30" min="5" max="1440">
+    </div>
+    <hr>
+    <h2>◆ SalesHub CRM</h2>
+    <div class="setting-group">
+      <label>Base44 API Key</label>
+      <input type="password" id="set-saleshub-key" placeholder="794f2a31...">
     </div>
     <button class="settings-save" onclick="saveSettings()">◆ Save Configuration</button>
     <div id="autosave-indicator" style="text-align:center;font-size:10px;color:var(--green);margin-top:10px;font-family:'Orbitron',sans-serif;letter-spacing:2px;min-height:16px;"></div>
@@ -1218,6 +1226,66 @@ const TOOLS = [
   { name: 'send_next_step', description: 'Send next sequence step to all leads due for follow-up.', input_schema: { type: 'object', properties: { businessDays: { type: 'number' }, dryRun: { type: 'boolean' } } } },
   { name: 'update_template', description: 'Update email sequence template step in CC.', input_schema: { type: 'object', properties: { step: { type: 'number' }, subjectTemplate: { type: 'string' }, bodyPrompt: { type: 'string' }, cta: { type: 'string' }, senderName: { type: 'string' }, senderRole: { type: 'string' }, senderEmail: { type: 'string' }, signature: { type: 'string' }, formattingRules: { type: 'string' } } } },
   { name: 'activate_leads', description: 'Activate existing leads by changing status (e.g. HOLD → NEW).', input_schema: { type: 'object', properties: { fromStatus: { type: 'string', default: 'HOLD' }, toStatus: { type: 'string', default: 'NEW' }, limit: { type: 'number', default: 50 } } } },
+  // ── SalesHub (Base44) tools ──
+  {
+    name: 'salesHub_get_contacts',
+    description: 'Query contacts from the Base44 SalesHub CRM. Use to look up leads, check their status, lead_status, phone numbers, company info. Supports filters like status, lead_status, company name. Returns contact records with all fields including additional_phones.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by status: new, contacted, qualified, unqualified, customer' },
+        lead_status: { type: 'string', description: 'Filter by lead_status: no_value, connected_right_contact, no_interest, shared_information, not_right_person, left_company, booked_meeting, no_answer_active_outreach, wrong_number' },
+        company: { type: 'string', description: 'Filter by company name (partial match)' },
+        limit: { type: 'number', description: 'Max records to return', default: 20 }
+      }
+    }
+  },
+  {
+    name: 'salesHub_update_contact',
+    description: 'Update a contact record in Base44 SalesHub. Use to change lead_status (e.g. mark as wrong_number, booked_meeting, no_interest), update notes, or change status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contact_id: { type: 'string', description: 'The _id of the contact record to update' },
+        lead_status: { type: 'string', description: 'New lead_status value' },
+        status: { type: 'string', description: 'New status value' },
+        notes: { type: 'string', description: 'Notes to append or set' },
+        call_attempts: { type: 'number', description: 'Update call attempt count' }
+      },
+      required: ['contact_id']
+    }
+  },
+  {
+    name: 'salesHub_search_contact',
+    description: 'Search for a specific contact in Base44 SalesHub by name, email, or company.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Name, email address, or company to search for' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'salesHub_get_pipeline',
+    description: 'Get a full pipeline summary from Base44 SalesHub — total contacts broken down by status and lead_status. Use for morning briefings or pipeline overviews.',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'salesHub_log_activity',
+    description: 'Log a call or activity against a contact in Base44 SalesHub. Use after a call to record outcome.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contact_id: { type: 'string', description: 'The _id of the contact' },
+        type: { type: 'string', description: 'Activity type: outbound_call, inbound_call, email_sent, note', default: 'outbound_call' },
+        outcome: { type: 'string', description: 'Outcome: no_answer, voicemail, interested, not_interested, wrong_number, callback_requested, completed' },
+        notes: { type: 'string', description: 'Notes about the activity' },
+        duration_minutes: { type: 'number', description: 'Call duration in minutes' }
+      },
+      required: ['contact_id', 'type']
+    }
+  },
 ];
 
 // ==================== SYSTEM PROMPT ====================
@@ -1237,7 +1305,7 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).`;
   }
 
@@ -1263,7 +1331,8 @@ Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Me
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}\nAuto-learn: If Laurence shares important personal facts, preferences or business context, proactively call memory_store to save them to FRIDAY/Profile.
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 KeepHub: Frontline employee optimisation platform. Streamline operations, improve customer experience, boost frontline efficiency. 6-step outreach.
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity
+SALESHUB RULE: salesHub_* tools query the Base44 SalesHub CRM directly. Use salesHub_search_contact to look up a contact by name/company, salesHub_update_contact to change lead_status (e.g. wrong_number, booked_meeting), salesHub_log_activity to record call outcomes, salesHub_get_pipeline for CRM pipeline overview. Always get a contact's id first before updating.
 RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.
 INSTRUCTION RULE: Read every message carefully before acting. Before ANY email send — always call get_send_limits first. If status is WARNING or STOP, inform Laurence and do not send. If Laurence says "send emails" — call send_emails, do NOT deploy_scout. If Laurence says "send to 5 leads" — send to exactly 5, not more, not fewer. If Laurence asks a question — answer it, do not take action. Never assume what Laurence wants — do exactly what is written. When in doubt, confirm before acting. Explicit chat instructions override everything.
 EMAIL TRACKING RULE: After EVERY send_emails or send_next_step call — immediately: (1) Show Laurence a summary table of what was sent: | Company | Email | Step | Subject |, (2) call memory_store with title="Send Log [date]" listing each recipient. Format clearly and concisely. This is mandatory — never skip it. If 0 emails sent, explain why.
@@ -1319,6 +1388,7 @@ async function loadSettings() {
   document.getElementById('set-gmail-email').value = settings.gmailEmail || '';
   document.getElementById('set-outlook-token').value = settings.outlookToken || '';
   document.getElementById('set-outlook-email').value = settings.outlookEmail || '';
+  document.getElementById('set-saleshub-key').value = settings.salesHubKey || '';
   document.getElementById('set-notif-enabled').value = settings.notifEnabled || 'on';
   document.getElementById('set-notif-interval').value = settings.notifInterval || 30;
 }
@@ -1360,6 +1430,7 @@ function readSettingsFromDOM() {
   settings.gmailEmail = (document.getElementById('set-gmail-email').value || '').trim();
   settings.outlookToken = (document.getElementById('set-outlook-token').value || '').trim();
   settings.outlookEmail = (document.getElementById('set-outlook-email').value || '').trim();
+  settings.salesHubKey = (document.getElementById('set-saleshub-key').value || '').trim();
   settings.notifEnabled = document.getElementById('set-notif-enabled').value;
   settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
 }
@@ -1382,7 +1453,7 @@ let _autoSaveInitialized = false;
 function initAutoSave() {
   if (_autoSaveInitialized) return;
   _autoSaveInitialized = true;
-  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval'];
+  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-saleshub-key'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -1595,6 +1666,80 @@ function startNotificationLoop() {
   setTimeout(async () => { try { /* Asana calls omitted — legacy helper removed in this surface, full logic retained in backend */ } catch(e) {} }, 10000);
 }
 
+
+// ==================== SALESHUB (BASE44) API ====================
+const SALESHUB_APP_ID = '69b30f5a877504390c2cf16c';
+const SALESHUB_BASE = 'https://api.base44.com/api/apps/' + SALESHUB_APP_ID + '/entities';
+
+async function salesHubApi(entity, method, body, qparams) {
+  method = method || 'GET'; qparams = qparams || {};
+  const apiKey = settings.salesHubKey || '794f2a31597f485e96d7c6ae5af1b37b';
+  let url = SALESHUB_BASE + '/' + entity;
+  const qs = Object.entries(qparams).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
+  if (qs) url += '?' + qs;
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'api_key': apiKey } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (!r.ok) { const err = await r.text(); throw new Error('SalesHub error (' + r.status + '): ' + err.substring(0, 200)); }
+  return r.json();
+}
+async function salesHubApiById(entity, id, method, body) {
+  method = method || 'GET';
+  const apiKey = settings.salesHubKey || '794f2a31597f485e96d7c6ae5af1b37b';
+  const url = SALESHUB_BASE + '/' + entity + '/' + id;
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'api_key': apiKey } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (!r.ok) { const err = await r.text(); throw new Error('SalesHub error (' + r.status + '): ' + err.substring(0, 200)); }
+  return r.json();
+}
+function shMapContact(c) {
+  return { id: c._id, name: ((c.first_name||'') + ' ' + (c.last_name||'')).trim(), company: c.company, status: c.status, lead_status: c.lead_status, phone: c.phone, additional_phones: c.additional_phones || [], email: c.email, job_title: c.job_title, notes: c.notes, call_attempts: c.call_attempts || 0, last_activity: c.last_activity_date };
+}
+async function shGetContacts(params) {
+  params = params || {};
+  const limit = params.limit || 20;
+  let results = await salesHubApi('Contact', 'GET', null, { limit: Math.min(limit * 3, 200) });
+  if (params.company) { const q = params.company.toLowerCase(); results = results.filter(c => (c.company||'').toLowerCase().includes(q)); }
+  if (params.status) results = results.filter(c => c.status === params.status);
+  if (params.lead_status) results = results.filter(c => c.lead_status === params.lead_status);
+  return { success: true, count: results.length, contacts: results.slice(0, limit).map(shMapContact) };
+}
+async function shUpdateContact(params) {
+  const id = params.contact_id;
+  const allowed = ['lead_status','status','notes','call_attempts'];
+  const body = {};
+  allowed.forEach(k => { if (params[k] !== undefined) body[k] = params[k]; });
+  body.last_activity_date = new Date().toISOString();
+  const result = await salesHubApiById('Contact', id, 'PUT', body);
+  return { success: true, contact_id: id, updated: body };
+}
+async function shSearchContact(params) {
+  const q = (params.query || '').toLowerCase();
+  const all = await salesHubApi('Contact', 'GET', null, { limit: 200 });
+  const matches = all.filter(c => {
+    const name = ((c.first_name||'') + ' ' + (c.last_name||'')).toLowerCase();
+    return name.includes(q) || (c.email||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q);
+  }).slice(0, 10);
+  return { success: true, count: matches.length, contacts: matches.map(shMapContact) };
+}
+async function shGetPipeline() {
+  const all = await salesHubApi('Contact', 'GET', null, { limit: 500 });
+  const byStatus = {}, byLead = {};
+  all.forEach(c => {
+    const s = c.status || 'new'; byStatus[s] = (byStatus[s]||0) + 1;
+    const l = c.lead_status || 'no_value'; byLead[l] = (byLead[l]||0) + 1;
+  });
+  return { success: true, total: all.length, by_status: byStatus, by_lead_status: byLead };
+}
+async function shLogActivity(params) {
+  const body = { contact_id: params.contact_id, type: params.type || 'outbound_call', outcome: params.outcome, notes: params.notes, duration_minutes: params.duration_minutes, logged_by: settings.gmailEmail || settings.profileName || 'FRIDAY' };
+  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+  const result = await salesHubApi('ActivityLog', 'POST', body);
+  try { await salesHubApiById('Contact', params.contact_id, 'PUT', { last_activity_date: new Date().toISOString() }); } catch(e) {}
+  return { success: true, logged: body };
+}
+
 async function executeAction(name, params) {
   if (name === 'memory_store') return memoryStore(params);
   if (name === 'memory_search') return memorySearch(params);
@@ -1609,6 +1754,11 @@ async function executeAction(name, params) {
   if (name === 'list_outlook') return outlookList(params);
   if (name === 'read_outlook') return outlookRead(params);
   if (name === 'send_outlook') return outlookSend(params);
+  if (name === 'salesHub_get_contacts') return shGetContacts(params);
+  if (name === 'salesHub_update_contact') return shUpdateContact(params);
+  if (name === 'salesHub_search_contact') return shSearchContact(params);
+  if (name === 'salesHub_get_pipeline') return shGetPipeline();
+  if (name === 'salesHub_log_activity') return shLogActivity(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionName, params: params || {} }) });
   return r.json();
@@ -1655,6 +1805,23 @@ function updatePanels(ccOnline) {
   const dotOutlook = document.getElementById('dot-outlook');
   if (settings.outlookToken) { outlookEl.textContent = 'ONLINE'; outlookEl.className = 'stat-val green'; dotOutlook.className = 'dot online'; }
   else { outlookEl.textContent = 'OFFLINE'; outlookEl.className = 'stat-val red'; dotOutlook.className = 'dot'; }
+
+  // SalesHub status check
+  const shEl = document.getElementById('saleshub-status');
+  const dotSh = document.getElementById('dot-saleshub');
+  if (shEl) {
+    shEl.textContent = 'TESTING...'; shEl.className = 'stat-val orange';
+    (async () => {
+      try {
+        await salesHubApi('Contact', 'GET', null, { limit: 1 });
+        shEl.textContent = 'ONLINE'; shEl.className = 'stat-val green';
+        if (dotSh) dotSh.className = 'dot online';
+      } catch(e) {
+        shEl.textContent = 'OFFLINE'; shEl.className = 'stat-val red';
+        if (dotSh) dotSh.className = 'dot';
+      }
+    })();
+  }
 
   if (statsData.pipeline) {
     const p = statsData.pipeline;
