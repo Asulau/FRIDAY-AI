@@ -776,7 +776,7 @@ body::after {
     <div class="stat-row"><span>CPU</span><span class="stat-val" id="cpu">--</span></div>
     <div class="stat-row"><span>Memory</span><span class="stat-val" id="mem">--</span></div>
     <div class="stat-row"><span>AI Engine</span><span class="stat-val green" id="engine">ANTHROPIC</span></div>
-    <div class="stat-row"><span>Voice</span><span class="stat-val green" id="voice-status">STREAMELEMENTS</span></div>
+    <div class="stat-row"><span>Voice</span><span class="stat-val green" id="voice-status">GOOGLE TTS</span></div>
     <div class="stat-row"><span>Uptime</span><span class="stat-val" id="uptime">00:00:00</span></div>
   </div>
   <div class="panel-box">
@@ -1785,7 +1785,7 @@ function updatePanels(ccOnline) {
 
   const voiceEl = document.getElementById('voice-status');
   if (settings.elevenKey) { voiceEl.textContent = 'ELEVENLABS'; voiceEl.className = 'stat-val green'; }
-  else { voiceEl.textContent = 'STREAMELEMENTS'; voiceEl.className = 'stat-val green'; }
+  else { voiceEl.textContent = 'GOOGLE TTS'; voiceEl.className = 'stat-val green'; }
 
   const obsEl = document.getElementById('obsidian-status');
   if (settings.obsidianKey) {
@@ -2044,28 +2044,41 @@ async function speak(text) {
     } catch(e) { console.warn('[FRIDAY] ElevenLabs error:', e); }
   }
 
-  // 2. StreamElements TTS — uses <audio> element to bypass CORS (Amazon Polly, Amy voice)
+  // 2. Google Translate TTS — real MP3, female British voice, no key needed
   try {
-    const seVoice = settings.seVoice || 'Amy';
-    const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${seVoice}&text=${encodeURIComponent(cleanText.substring(0, 500))}`;
+    const gtUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText.substring(0, 200))}&tl=en-GB&client=tw-ob&ttsspeed=0.92`;
     await new Promise((resolve, reject) => {
-      const audio = new Audio(seUrl);
+      const audio = new Audio(gtUrl);
       orbState = 'speaking';
       audio.onended = () => { orbState = 'idle'; resolve(); };
       audio.onerror = (e) => reject(e);
       audio.play().catch(reject);
     });
     return;
-  } catch(e) { console.warn('[FRIDAY] StreamElements TTS error:', e); orbState = 'idle'; }
+  } catch(e) { console.warn('[FRIDAY] Google TTS error:', e); orbState = 'idle'; }
 
-  // 3. Browser fallback
+  // 3. Browser fallback — try Chrome's Google voices first (much better than system voices)
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(cleanText.substring(0, 500));
-    const loadVoice = () => { const voices = window.speechSynthesis.getVoices(); const preferred = voices.find(v => v.lang === 'en-GB' && v.localService) || voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')); if (preferred) utt.voice = preferred; };
-    loadVoice();
-    if (window.speechSynthesis.onvoiceschanged !== undefined) window.speechSynthesis.onvoiceschanged = loadVoice;
-    utt.rate = 1.05; utt.pitch = 1.0;
+    const pickVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      return voices.find(v => v.name === 'Google UK English Female')
+          || voices.find(v => v.name === 'Google US English Female')
+          || voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
+          || voices.find(v => v.name === 'Samantha')
+          || voices.find(v => v.name === 'Karen')
+          || voices.find(v => v.name === 'Moira')
+          || voices.find(v => v.gender === 'female' && v.lang.startsWith('en'))
+          || voices.find(v => v.lang === 'en-GB')
+          || voices.find(v => v.lang.startsWith('en'));
+    };
+    const applyVoice = () => { const v = pickVoice(); if (v) utt.voice = v; };
+    applyVoice();
+    if (!utt.voice && window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = applyVoice;
+    }
+    utt.rate = 1.0; utt.pitch = 1.1;
     orbState = 'speaking';
     utt.onend = () => { orbState = 'idle'; };
     window.speechSynthesis.speak(utt);
