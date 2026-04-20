@@ -843,7 +843,17 @@ RULE: Never tell Laurence to manually perform any action you have a tool for. CC
   const recentLeads = leadsData.slice(0, 5).map(l => ({
     name: (l.firstName||l.name||'')+' '+(l.lastName||''), company: l.company||'', status: l.status||''
   }));
-  return `You are FRIDAY ÃÂ¢ÃÂÃÂ Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
+  return `You are FRIDAY — Laurence's personal AI. Think Jarvis, not chatbot. You know Laurence, you know the work, you act first and report after.
+
+Personality: Warm, sharp, British. Dry wit when it fits. Never stiff, never corporate. Speak like a trusted colleague who's brilliant at everything.
+
+How you respond:
+- You DO things. Never say "I'll do that" — just do it, then report. Lead with the result.
+- Match length to complexity: quick task — one line. Complex situation — as much as needed. Never pad, never cut important detail.
+- Proactive: notice things while working and surface them. "Done. Also — worth knowing..."
+- Natural callbacks: reference previous context like a person would. "Given what you said about..."
+- Voice: "Right away." / "On it." / "Done." / "Noted." / "Interesting — here's why that matters."
+- NOT: "I'll do that for you." / "Certainly!" / "I have successfully completed..." / "Here is a summary of..."
 
 ${(settings.profileName || settings.profileRole || settings.profileGoals) ? '## About ' + (settings.profileName || 'Laurence') + '\n' + (settings.profileRole ? 'Role: ' + settings.profileRole + '\n' : '') + (settings.profileStyle ? 'Communication style: ' + settings.profileStyle + '\n' : '') + (settings.profileProjects ? 'Key projects : ' + settings.profileProjects + '\n' : '') + (settings.profileGoals ? 'Goals: ' + settings.profileGoals + '\n' : '') + '\n' : ''}
 Pipeline: ${totalLeads} leads | ${JSON.stringify(byStatus)}
@@ -2028,66 +2038,55 @@ document.addEventListener('click', function unlockAudio() {
 }, { once: true });
 
 async function speak(text) {
-  if (!settings.elevenKey || !settings.voiceId) return;
-  try {
-    const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
-    if (!cleanText) return;
-    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
-      body: JSON.stringify({
-        text: cleanText,
-        model_id: 'eleven_turbo_v2_5',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
-      })
-    });
-    if (r.ok) {
-      const arrayBuffer = await r.arrayBuffer();
-      const ctx = _getAudioCtx();
-      if (ctx.state === 'suspended') await ctx.resume();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      orbState = 'speaking';
-      source.onended = () => { orbState = 'idle'; };
-      source.start(0);
-    } else {
-      console.error('ElevenLabs error:', r.status, await r.text().then(t=>t.substring(0,200)));
-    }
-  } catch(e) { console.error('TTS error:', e); }
-}
-
-// ==================== KOKORO TTS ====================
-// Primary voice: bf_lily (British female) | Fallback: ElevenLabs
-let kokoroTTS = null;
-const _originalSpeak = speak;
-(async () => {
-  try {
-    const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.2/dist/kokoro.web.js');
-    kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0', { dtype: 'q8' });
-    console.log('[FRIDAY] Kokoro TTS ready (bf_lily)');
-  } catch(e) { console.warn('[FRIDAY] Kokoro failed to load, falling back to ElevenLabs:', e); }
-})();
-
-speak = async function(text) {
   const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
   if (!cleanText) return;
-  if (kokoroTTS) {
-    try {
-      const audio = await kokoroTTS.generate(cleanText, { voice: 'bf_lily' });
-      const blob = audio.toBlob('audio/wav');
-      const url = URL.createObjectURL(blob);
-      const a = new Audio(url);
-      orbState = 'speaking';
-      a.onended = () => { orbState = 'idle'; URL.revokeObjectURL(url); };
-      a.play();
-      return;
-    } catch(e) { console.warn('[FRIDAY] Kokoro error, using ElevenLabs:', e); }
-  }
-  return _originalSpeak(text);
-};
 
+  // Primary: ElevenLabs (if configured)
+  if (settings.elevenKey && settings.voiceId) {
+    try {
+      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey },
+        body: JSON.stringify({ text: cleanText, model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+      });
+      if (r.ok) {
+        const arrayBuffer = await r.arrayBuffer();
+        const ctx = _getAudioCtx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        orbState = 'speaking';
+        source.onended = () => { orbState = 'idle'; };
+        source.start(0);
+        return;
+      }
+    } catch(e) { console.warn('[FRIDAY] ElevenLabs error, falling back to Web Speech:', e); }
+  }
+
+  // Fallback: Web Speech API (always available, no key needed)
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(cleanText.substring(0, 500));
+    const loadVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.lang === 'en-GB' && v.localService)
+        || voices.find(v => v.lang === 'en-GB')
+        || voices.find(v => v.lang.startsWith('en'));
+      if (preferred) utt.voice = preferred;
+    };
+    loadVoice();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoice;
+    }
+    utt.rate = 1.05;
+    utt.pitch = 1.0;
+    orbState = 'speaking';
+    utt.onend = () => { orbState = 'idle'; };
+    window.speechSynthesis.speak(utt);
+  }
+}
 function toggleMic() {
   if (isRecording) { stopRecording(); }
   else { startRecording(); }
