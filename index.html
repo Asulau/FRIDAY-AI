@@ -1669,7 +1669,7 @@ function startNotificationLoop() {
 
 // ==================== SALESHUB (BASE44) API ====================
 const SALESHUB_APP_ID = '69b30f5a877504390c2cf16c';
-const SALESHUB_BASE = 'https://api.base44.com/api/apps/' + SALESHUB_APP_ID + '/entities';
+const SALESHUB_BASE = 'https://app.base44.com/api/apps/' + SALESHUB_APP_ID + '/entities';
 
 async function salesHubApi(entity, method, body, qparams) {
   method = method || 'GET'; qparams = qparams || {};
@@ -2044,25 +2044,19 @@ async function speak(text) {
     } catch(e) { console.warn('[FRIDAY] ElevenLabs error:', e); }
   }
 
-  // 2. StreamElements TTS (free, no key needed — Amazon Polly voices)
+  // 2. StreamElements TTS — uses <audio> element to bypass CORS (Amazon Polly, Amy voice)
   try {
     const seVoice = settings.seVoice || 'Amy';
     const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${seVoice}&text=${encodeURIComponent(cleanText.substring(0, 500))}`;
-    const r = await fetch(seUrl);
-    if (r.ok) {
-      const arrayBuffer = await r.arrayBuffer();
-      const ctx = _getAudioCtx();
-      if (ctx.state === 'suspended') await ctx.resume();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
+    await new Promise((resolve, reject) => {
+      const audio = new Audio(seUrl);
       orbState = 'speaking';
-      source.onended = () => { orbState = 'idle'; };
-      source.start(0);
-      return;
-    }
-  } catch(e) { console.warn('[FRIDAY] StreamElements TTS error:', e); }
+      audio.onended = () => { orbState = 'idle'; resolve(); };
+      audio.onerror = (e) => reject(e);
+      audio.play().catch(reject);
+    });
+    return;
+  } catch(e) { console.warn('[FRIDAY] StreamElements TTS error:', e); orbState = 'idle'; }
 
   // 3. Browser fallback
   if (window.speechSynthesis) {
