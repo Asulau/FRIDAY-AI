@@ -776,7 +776,7 @@ body::after {
     <div class="stat-row"><span>CPU</span><span class="stat-val" id="cpu">--</span></div>
     <div class="stat-row"><span>Memory</span><span class="stat-val" id="mem">--</span></div>
     <div class="stat-row"><span>AI Engine</span><span class="stat-val green" id="engine">ANTHROPIC</span></div>
-    <div class="stat-row"><span>Voice</span><span class="stat-val green" id="voice-status">ELEVENLABS</span></div>
+    <div class="stat-row"><span>Voice</span><span class="stat-val green" id="voice-status">STREAMELEMENTS</span></div>
     <div class="stat-row"><span>Uptime</span><span class="stat-val" id="uptime">00:00:00</span></div>
   </div>
   <div class="panel-box">
@@ -1785,7 +1785,7 @@ function updatePanels(ccOnline) {
 
   const voiceEl = document.getElementById('voice-status');
   if (settings.elevenKey) { voiceEl.textContent = 'ELEVENLABS'; voiceEl.className = 'stat-val green'; }
-  else { voiceEl.textContent = 'OFF'; voiceEl.className = 'stat-val red'; }
+  else { voiceEl.textContent = 'STREAMELEMENTS'; voiceEl.className = 'stat-val green'; }
 
   const obsEl = document.getElementById('obsidian-status');
   if (settings.obsidianKey) {
@@ -2023,6 +2023,8 @@ document.addEventListener('click', function unlockAudio() { if (_audioCtx && _au
 async function speak(text) {
   const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
   if (!cleanText) return;
+
+  // 1. ElevenLabs (if key available)
   if (settings.elevenKey && settings.voiceId) {
     try {
       const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey }, body: JSON.stringify({ text: cleanText, model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }) });
@@ -2041,6 +2043,28 @@ async function speak(text) {
       }
     } catch(e) { console.warn('[FRIDAY] ElevenLabs error:', e); }
   }
+
+  // 2. StreamElements TTS (free, no key needed — Amazon Polly voices)
+  try {
+    const seVoice = settings.seVoice || 'Amy';
+    const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${seVoice}&text=${encodeURIComponent(cleanText.substring(0, 500))}`;
+    const r = await fetch(seUrl);
+    if (r.ok) {
+      const arrayBuffer = await r.arrayBuffer();
+      const ctx = _getAudioCtx();
+      if (ctx.state === 'suspended') await ctx.resume();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      orbState = 'speaking';
+      source.onended = () => { orbState = 'idle'; };
+      source.start(0);
+      return;
+    }
+  } catch(e) { console.warn('[FRIDAY] StreamElements TTS error:', e); }
+
+  // 3. Browser fallback
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(cleanText.substring(0, 500));
