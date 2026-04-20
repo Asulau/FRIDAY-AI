@@ -246,6 +246,28 @@ body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--te
       <p style="font-size:10px;color:#888;margin-top:4px">Web search is always available at no cost.</p>
     </div>
     <hr style="border-color:var(--border);margin:16px 0">
+    <h2 style="font-size:12px;margin-bottom:12px">LAURECE PROFILE</h2>
+    <div class="setting-group">
+      <label>YOUR NAME</label>
+      <input type="text" id="set-profile-name" placeholder="Laurence">
+    </div>
+    <div class="setting-group">
+      <label>YOUR ROLE</label>
+      <input type="text" id="set-profile-role" placeholder="e.g. Founder at KeepHub">
+    </div>
+    <div class="setting-group">
+      <label>COMMUNICATION STYLE</label>
+      <input type="text" id="set-profile-style" placeholder="e.g. direct, concise, no fluff">
+    </div>
+    <div class="setting-group">
+      <label>KEY PROJECTS</label>
+      <textarea id="set-profile-projects" rows="3" placeholder="e.g. KeepHub outreach, product launch Q2..."></textarea>
+    </div>
+    <div class="setting-group">
+      <label>CURRENT GOALS</label>
+      <textarea id="set-profile-goals" rows="3" placeholder="e.g. close 10 enterprise deals, launch v2 by June..."></textarea>
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
     <h2 style="font-size:12px;margin-bottom:12px">OBSIDIAN MEMORY BANK</h2>
     <div class="setting-group">
       <label>OBSIDIAN REST API URL</label>
@@ -798,6 +820,7 @@ const TOOLS = [
 // ==================== SYSTEM PROMPT ====================
 let memoryContext = ''; // loaded at startup from Obsidian
 let lastSessionSummary = ''; // loaded from IndexedDB
+let sessionSaveTimer = null; // debounce timer for session summary
 
 function buildSystemPrompt() {
   const totalLeads = leadsData.length;
@@ -822,10 +845,11 @@ RULE: Never tell Laurence to manually perform any action you have a tool for. CC
   }));
   return `You are FRIDAY ÃÂ¢ÃÂÃÂ Laurence's AI operations partner. Stark-level assistant. Act, don't describe. Chain tools (up to 12). 1-3 sentence replies.
 
+${(settings.profileName || settings.profileRole || settings.profileGoals) ? '## About ' + (settings.profileName || 'Laurence') + '\n' + (settings.profileRole ? 'Role: ' + settings.profileRole + '\n' : '') + (settings.profileStyle ? 'Communication style: ' + settings.profileStyle + '\n' : '') + (settings.profileProjects ? 'Key projects : ' + settings.profileProjects + '\n' : '') + (settings.profileGoals ? 'Goals: ' + settings.profileGoals + '\n' : '') + '\n' : ''}
 Pipeline: ${totalLeads} leads | ${JSON.stringify(byStatus)}
 Recent: ${JSON.stringify(recentLeads)}
 Asana:${settings.asanaPat?'LIVE':'OFF'} Web:${settings.braveKey?'LIVE':'OFF'} Memory:${settings.obsidianKey?'LIVE ('+settings.obsidianFolder+')':'OFF'} Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
-${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}
+${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}\nAuto-learn: If Laurence shares important personal facts, preferences or business context, proactively call memory_store to save them to FRIDAY/Profile.
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 KeepHub: Frontline employee optimisation platform. Streamline operations, improve customer experience, boost frontline efficiency. 6-step outreach.
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse
@@ -915,6 +939,11 @@ async function loadSettings() {
   document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'http://127.0.0.1:27123';
   document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
   document.getElementById('set-obsidian-folder').value = settings.obsidianFolder || 'FRIDAY/Memory';
+  document.getElementById('set-profile-name').value = settings.profileName || 'Laurence';
+  document.getElementById('set-profile-role').value = settings.profileRole || '';
+  document.getElementById('set-profile-style').value = settings.profileStyle || '';
+  document.getElementById('set-profile-projects').value = settings.profileProjects || '';
+  document.getElementById('set-profile-goals').value = settings.profileGoals || '';
   document.getElementById('set-gmail-token').value = settings.gmailToken || '';
   document.getElementById('set-gmail-email').value = settings.gmailEmail || '';
   document.getElementById('set-outlook-token').value = settings.outlookToken || '';
@@ -954,6 +983,11 @@ function readSettingsFromDOM() {
   settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'http://127.0.0.1:27123';
   settings.obsidianKey = (document.getElementById('set-obsidian-key').value || '').trim();
   settings.obsidianFolder = (document.getElementById('set-obsidian-folder').value || '').trim() || 'FRIDAY/Memory';
+  settings.profileName = (document.getElementById('set-profile-name').value || '').trim() || 'Laurence';
+  settings.profileRole = (document.getElementById('set-profile-role').value || '').trim();
+  settings.profileStyle = (document.getElementById('set-profile-style').value || '').trim();
+  settings.profileProjects = (document.getElementById('set-profile-projects').value || '').trim();
+  settings.profileGoals = (document.getElementById('set-profile-goals').value || '').trim();
   settings.gmailToken = (document.getElementById('set-gmail-token').value || '').trim();
   settings.gmailEmail = (document.getElementById('set-gmail-email').value || '').trim();
   settings.outlookToken = (document.getElementById('set-outlook-token').value || '').trim();
@@ -2137,6 +2171,7 @@ async function sendMessage() {
   orbState = 'speaking';
   addMsg('friday', result.text, result.tools);
   speak(result.text);
+  triggerSessionSave();
   setTimeout(() => { orbState = 'idle'; }, 4000);
 
   // Save to DB
@@ -2178,9 +2213,16 @@ function updateClock() {
 async function loadMemoryContext() {
   if (!settings.obsidianKey || !settings.obsidianUrl) return;
   try {
-    // Load preferences and key contacts from memory
-    const searchTerms = ['preference', 'contact', 'priority', 'important'];
     let contextParts = [];
+    // Read dedicated FRIDAY profile note first
+    try {
+      const profileNote = await memoryRead({ path: 'FRIDAY/Profile.md' });
+      if (profileNote && profileNote.content) {
+        contextParts.push('=== FRIDAY Profile ===' + '\n' + profileNote.content.substring(0, 1000));
+      }
+    } catch(e) { /* profile note not yet created */ }
+    // Search for recent relevant context
+    const searchTerms = ['preference', 'contact', 'priority', 'important', 'remember'];
     for (const term of searchTerms) {
       try {
         const results = await memorySearch({ query: term });
@@ -2200,8 +2242,10 @@ async function loadMemoryContext() {
 }
 
 async function loadLastSession() {
-  // Get last few messages from IndexedDB history
+  // Load AI-generated session summary from localStorage, or build from raw history
   try {
+    const saved = localStorage.getItem('FRIDAY_SESSION_SUMMARY');
+    if (saved) { lastSessionSummary = saved; return; }
     const tx = db.transaction('history', 'readonly');
     const store = tx.objectStore('history');
     const req = store.openCursor(null, 'prev');
@@ -2209,21 +2253,49 @@ async function loadLastSession() {
     await new Promise((resolve) => {
       req.onsuccess = (e) => {
         const cursor = e.target.result;
-        if (cursor && msgs.length < 5) {
-          msgs.push(cursor.value);
-          cursor.continue();
-        } else resolve();
+        if (cursor && msgs.length < 8) { msgs.push(cursor.value); cursor.continue(); }
+        else resolve();
       };
       req.onerror = () => resolve();
     });
     if (msgs.length > 0) {
       lastSessionSummary = msgs.reverse().map(m =>
-        `User: ${(m.user || '').substring(0, 100)} ÃÂ¢ÃÂÃÂ FRIDAY: ${(m.friday || '').substring(0, 150)}`
+        'User: ' + (m.user || '').substring(0, 120) + ' \u2192 FRIDAY: ' + (m.friday || '').substring(0, 180)
       ).join('\n');
     }
   } catch(e) { /* non-critical */ }
 }
 
+function triggerSessionSave() {
+  // Debounced: save summary 30s after last FRIDAY response
+  clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = setTimeout(() => saveSessionSummary(), 30000);
+}
+
+async function saveSessionSummary() {
+  // Generate AI summary of current conversation and persist it
+  if (!conversationHistory || conversationHistory.length < 4) return;
+  try {
+    const recentMsgs = conversationHistory.slice(-16);
+    const transcript = recentMsgs.map(m =>
+      (m.role === 'user' ? 'Laurence: ' : 'FRIDAY: ') +
+      (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).substring(0, 300)
+    ).join('\n');
+    const today = new Date().toISOString().split('T')[0];
+    const summaryPrompt = 'Summarise this conversation in 3-5 bullet points. Focus on decisions, tasks actioned, and key info. Be concise.\n\n' + transcript;
+    const summaryResp = await callAI([{ role: 'user', content: summaryPrompt }], 'You are a concise summariser.');
+    if (summaryResp) {
+      lastSessionSummary = '[' + today + '] ' + summaryResp;
+      localStorage.setItem('FRIDAY_SESSION_SUMMARY', lastSessionSummary);
+      if (settings.obsidianKey && settings.obsidianUrl) {
+        try {
+          await memoryStore({ path: 'FRIDAY/Sessions/' + today + '.md',
+            content: '# FRIDAY Session ' + today + '\n\n' + summaryResp });
+        } catch(e) { /* non-critical */ }
+      }
+    }
+  } catch(e) { console.log('Session summary generation failed (non-critical):', e.message); }
+}
 // ==================== PROACTIVE MORNING BRIEFING ====================
 async function proactiveBriefing() {
   if (!getActiveKey()) return;
@@ -2248,6 +2320,7 @@ async function proactiveBriefing() {
   orbState = 'speaking';
   addMsg('friday', result.text, result.tools);
   speak(result.text);
+  triggerSessionSave();
   setTimeout(() => { orbState = 'idle'; }, 4000);
 }
 
