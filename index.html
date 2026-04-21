@@ -900,11 +900,25 @@ body::after {
       <input type="text" id="set-cc-url" placeholder="https://leadfinder-rho.vercel.app">
     </div>
     <div class="setting-group">
-      <label>ElevenLabs API Key</label>
+      <label>Unreal Speech API Key <span style="font-size:11px;opacity:.6;">(free at unrealspeech.com — best voice)</span></label>
+      <input type="password" id="set-unreal-key" placeholder="Your Unreal Speech token">
+    </div>
+    <div class="setting-group">
+      <label>Unreal Speech Voice</label>
+      <select id="set-unreal-voice" style="background:#0a1220;color:#e8f2ff;border:1px solid rgba(120,200,255,0.2);padding:8px 10px;border-radius:6px;width:100%;font-size:13px;">
+        <option value="Scarlett">Scarlett (female, warm)</option>
+        <option value="Liv">Liv (female, natural)</option>
+        <option value="Amy">Amy (female, British)</option>
+        <option value="Dan">Dan (male, deep)</option>
+        <option value="Will">Will (male, natural)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>ElevenLabs API Key <span style="font-size:11px;opacity:.6;">(optional upgrade)</span></label>
       <input type="password" id="set-eleven-key" placeholder="ElevenLabs API key">
     </div>
     <div class="setting-group">
-      <label>Voice ID</label>
+      <label>ElevenLabs Voice ID</label>
       <input type="text" id="set-voice-id" placeholder="pFZP5JQG7iQjIQuC4Bku">
     </div>
     <div class="setting-group">
@@ -1019,6 +1033,8 @@ let settings = {
   geminiKey: '',
   geminiModel: 'gemini-2.0-flash',
   ccUrl: 'https://leadfinder-rho.vercel.app',
+  unrealKey: '',
+  unrealVoice: 'Scarlett',
   elevenKey: '',
   voiceId: 'pFZP5JQG7iQjIQuC4Bku',
   model: 'claude-sonnet-4-20250514',
@@ -1370,6 +1386,8 @@ async function loadSettings() {
   document.getElementById('set-gemini-model').value = settings.geminiModel || 'gemini-2.0-flash';
   document.getElementById('set-api-key').value = settings.apiKey || '';
   document.getElementById('set-cc-url').value = settings.ccUrl || '';
+  document.getElementById('set-unreal-key').value = settings.unrealKey || '';
+  document.getElementById('set-unreal-voice').value = settings.unrealVoice || 'Scarlett';
   document.getElementById('set-eleven-key').value = settings.elevenKey || '';
   document.getElementById('set-voice-id').value = settings.voiceId || '';
   document.getElementById('set-asana-pat').value = settings.asanaPat || '';
@@ -1412,6 +1430,8 @@ function readSettingsFromDOM() {
   settings.geminiModel = document.getElementById('set-gemini-model').value;
   settings.apiKey = (document.getElementById('set-api-key').value || '').trim();
   settings.ccUrl = (document.getElementById('set-cc-url').value || '').trim();
+  settings.unrealKey = (document.getElementById('set-unreal-key').value || '').trim();
+  settings.unrealVoice = (document.getElementById('set-unreal-voice').value || 'Scarlett').trim();
   settings.elevenKey = (document.getElementById('set-eleven-key').value || '').trim();
   settings.voiceId = (document.getElementById('set-voice-id').value || '').trim();
   settings.asanaPat = (document.getElementById('set-asana-pat').value || '').trim();
@@ -1786,6 +1806,7 @@ function updatePanels(ccOnline) {
 
   const voiceEl = document.getElementById('voice-status');
   if (settings.elevenKey) { voiceEl.textContent = 'ELEVENLABS'; voiceEl.className = 'stat-val green'; }
+  else if (settings.unrealKey) { voiceEl.textContent = 'UNREAL/' + (settings.unrealVoice || 'SCARLETT').toUpperCase(); voiceEl.className = 'stat-val green'; }
   else { voiceEl.textContent = 'GOOGLE TTS'; voiceEl.className = 'stat-val green'; }
 
   const obsEl = document.getElementById('obsidian-status');
@@ -2025,7 +2046,32 @@ async function speak(text) {
   const cleanText = text.replace(/[*_`#\[\]]/g, '').replace(/https?:\/\/\S+/g, '').trim().substring(0, 800);
   if (!cleanText) return;
 
-  // 1. ElevenLabs (if key available)
+  // 1. Unreal Speech (best quality free TTS — unrealspeech.com)
+  if (settings.unrealKey) {
+    try {
+      const voice = settings.unrealVoice || 'Scarlett';
+      const r = await fetch('https://api.v7.unrealspeech.com/speech', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + settings.unrealKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Text: cleanText.substring(0, 1000), VoiceId: voice, Bitrate: '192k', Speed: '0', Pitch: '1' })
+      });
+      if (r.ok) {
+        const arrayBuffer = await r.arrayBuffer();
+        const ctx = _getAudioCtx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        orbState = 'speaking';
+        source.onended = () => { orbState = 'idle'; };
+        source.start(0);
+        return;
+      }
+    } catch(e) { console.warn('[FRIDAY] Unreal Speech error:', e); }
+  }
+
+  // 2. ElevenLabs (if key available)
   if (settings.elevenKey && settings.voiceId) {
     try {
       const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'xi-api-key': settings.elevenKey }, body: JSON.stringify({ text: cleanText, model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }) });
