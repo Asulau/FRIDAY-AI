@@ -2199,9 +2199,7 @@ async function saveSessionSummary() {
 
 async function proactiveBriefing() {
   if (!getActiveKey()) return;
-  const hasIntegrations = settings.asanaPat || settings.gmailToken || settings.outlookToken;
-  if (!hasIntegrations) return;
-  const briefingPrompt = `Give me a quick morning briefing. Check what's important right now — tasks due today, any urgent emails, pipeline status. Keep it to 3-4 lines max. Be direct.`;
+  const briefingPrompt = `Give me a concise morning briefing. Pull the pipeline summary from SalesHub, check CC status, and surface anything that needs attention today. Be direct, max 4 lines. No bullet points.`;
   orbState = 'thinking';
   const typingDiv = document.createElement('div');
   typingDiv.className = 'msg friday';
@@ -2216,6 +2214,27 @@ async function proactiveBriefing() {
   speak(result.text);
   triggerSessionSave();
   setTimeout(() => { orbState = 'idle'; }, 4000);
+}
+
+let _heartbeatTimer = null;
+async function heartbeat() {
+  if (!getActiveKey()) return;
+  if (orbState !== 'idle') return; // Don't interrupt if already active
+  try {
+    const prompt = `You are running a silent background check. Look at the current time and any available data (pipeline, CC). Only speak up if there is something genuinely worth flagging right now — an unusual pipeline change, something overdue, or an important pattern. If nothing is notable, respond with exactly the word: SILENT. Otherwise give one short sentence.`;
+    const result = await callClaude(prompt);
+    if (!result.text || result.text.trim().toUpperCase() === 'SILENT') return;
+    orbState = 'speaking';
+    addMsg('friday', result.text, result.tools);
+    speak(result.text);
+    setTimeout(() => { orbState = 'idle'; }, 4000);
+  } catch(e) { console.warn('[FRIDAY] heartbeat error:', e); }
+}
+
+function startHeartbeat(intervalMinutes) {
+  if (_heartbeatTimer) clearInterval(_heartbeatTimer);
+  const ms = (intervalMinutes || 10) * 60 * 1000;
+  _heartbeatTimer = setInterval(heartbeat, ms);
 }
 
 async function init() {
@@ -2244,6 +2263,7 @@ async function init() {
     addMsg('friday', `${greeting}, Sir. Systems online. Scanning what needs your attention...`);
     speak(`${greeting}, Sir. Systems online.`);
     setTimeout(() => proactiveBriefing(), 1500);
+    startHeartbeat(10); // Check in every 10 minutes and push if anything's notable
   }
 }
 
