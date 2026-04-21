@@ -1009,6 +1009,12 @@ body::after {
       <label>Base44 API Key</label>
       <input type="password" id="set-saleshub-key" placeholder="794f2a31...">
     </div>
+    <hr>
+    <h2>◆ Notion</h2>
+    <div class="setting-group">
+      <label>Notion Integration Token <span style="font-size:11px;opacity:.6;">(notion.so → Settings → Connections → Develop integrations)</span></label>
+      <input type="password" id="set-notion-key" placeholder="secret_...">
+    </div>
     <button class="settings-save" onclick="saveSettings()">◆ Save Configuration</button>
     <div id="autosave-indicator" style="text-align:center;font-size:10px;color:var(--green);margin-top:10px;font-family:'Orbitron',sans-serif;letter-spacing:2px;min-height:16px;"></div>
   </div>
@@ -1044,6 +1050,7 @@ let settings = {
   obsidianUrl: 'http://127.0.0.1:27123',
   obsidianKey: '',
   obsidianFolder: 'FRIDAY/Memory',
+  notionKey: '',
   gmailToken: '',
   gmailEmail: '',
   outlookToken: '',
@@ -1302,6 +1309,13 @@ const TOOLS = [
       required: ['contact_id', 'type']
     }
   },
+  // ── Notion tools ──
+  { name: 'notion_search_crm', description: 'Search the Purple Lakes CRM in Notion by company name, contact name, or stage. Returns matching leads with their stage, contact, email and closing date.', input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Company name, contact name, or keyword to search for' }, stage: { type: 'string', description: 'Filter by stage: Qualified, Discovery, Demo, Proposal, Contract, Signed, Follow-up, Schedule, Declined, Lost' }, limit: { type: 'number', description: 'Max results to return', default: 10 } } } },
+  { name: 'notion_update_lead', description: 'Update a lead entry in the Purple Lakes CRM Notion database. Can update Stage, Contact, Email, Phone Number, closing date, Buying Maturity, Relationship Strength.', input_schema: { type: 'object', properties: { page_id: { type: 'string', description: 'The Notion page ID of the lead to update' }, stage: { type: 'string', description: 'New stage value' }, contact: { type: 'string', description: 'Contact person name' }, email: { type: 'string', description: 'Contact email' }, phone: { type: 'string', description: 'Phone number' }, closing_date: { type: 'string', description: 'Expected closing date (YYYY-MM-DD)' }, buying_maturity: { type: 'string', description: 'Low, Medium, or High' }, relationship_strength: { type: 'string', description: 'None, Low, Medium, or High' }, notes: { type: 'string', description: 'Notes to append to the page body' } }, required: ['page_id'] } },
+  { name: 'notion_add_lead', description: 'Add a new company/lead to the Purple Lakes CRM in Notion.', input_schema: { type: 'object', properties: { company: { type: 'string', description: 'Company name (required)' }, contact: { type: 'string', description: 'Contact person name' }, email: { type: 'string', description: 'Email address' }, phone: { type: 'string', description: 'Phone number' }, stage: { type: 'string', description: 'Stage: Qualified, Discovery, Demo, Proposal, etc.' }, country: { type: 'string', description: 'Country' }, notes: { type: 'string', description: 'Initial notes' } }, required: ['company'] } },
+  { name: 'notion_get_follow_ups', description: 'Get entries from the Purple Lakes Follow Up database in Notion — leads in the nurture/follow-up pipeline.', input_schema: { type: 'object', properties: { stage: { type: 'string', description: 'Filter by stage: Qualified, Discovery, Demo, Proposal, Contract, Nurture' }, limit: { type: 'number', default: 20 } } } },
+  // ── Vault browse (Obsidian) ──
+  { name: 'vault_browse', description: 'List all files in a folder of the Obsidian vault. Use with folder="" to list root vault contents. Helps discover notes that are not in FRIDAY/Memory.', input_schema: { type: 'object', properties: { folder: { type: 'string', description: 'Vault folder path to list, e.g. "" for root, "Projects", "Clients". Leave empty for root.' } } } },
 ];
 
 // ==================== SYSTEM PROMPT ====================
@@ -1394,6 +1408,7 @@ async function loadSettings() {
   document.getElementById('set-asana-project').value = settings.asanaProjectGid || '1213654696710519';
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
   document.getElementById('set-brave-key').value = settings.braveKey || '';
+  document.getElementById('set-notion-key').value = settings.notionKey || '';
   document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'http://127.0.0.1:27123';
   document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
   document.getElementById('set-obsidian-folder').value = settings.obsidianFolder || 'FRIDAY/Memory';
@@ -1438,6 +1453,7 @@ function readSettingsFromDOM() {
   settings.asanaProjectGid = (document.getElementById('set-asana-project').value || '').trim() || '1213654696710519';
   settings.model = document.getElementById('set-model').value;
   settings.braveKey = (document.getElementById('set-brave-key').value || '').trim();
+  settings.notionKey = (document.getElementById('set-notion-key').value || '').trim();
   settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'http://127.0.0.1:27123';
   settings.obsidianKey = (document.getElementById('set-obsidian-key').value || '').trim();
   settings.obsidianFolder = (document.getElementById('set-obsidian-folder').value || '').trim() || 'FRIDAY/Memory';
@@ -1761,6 +1777,107 @@ async function shLogActivity(params) {
   return { success: true, logged: body };
 }
 
+// ==================== NOTION API ====================
+const NOTION_CRM_DB = 'e2ef83cd-b8f3-497e-8db8-425e0f5b87cd';
+const NOTION_FOLLOWUP_DB = '07485790-bcb1-4569-a85c-86e008e266f2';
+
+async function notionApi(endpoint, method, body) {
+  if (!settings.notionKey) throw new Error('Notion key not set — add it in Settings');
+  const opts = { method: method || 'GET', headers: { 'Authorization': 'Bearer ' + settings.notionKey, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('https://api.notion.com/v1' + endpoint, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error('Notion error (' + r.status + '): ' + (data.message || JSON.stringify(data)));
+  return data;
+}
+
+function notionPageToLead(page) {
+  const p = page.properties || {};
+  const getTitle = (prop) => prop?.title?.[0]?.plain_text || prop?.rich_text?.[0]?.plain_text || '';
+  const getText = (prop) => prop?.rich_text?.[0]?.plain_text || '';
+  const getSelect = (prop) => prop?.select?.name || '';
+  const getEmail = (prop) => prop?.email || '';
+  const getPhone = (prop) => prop?.phone_number || '';
+  const getDate = (prop) => prop?.date?.start || '';
+  return {
+    id: page.id,
+    url: page.url,
+    company: getTitle(p['Company']),
+    contact: getText(p['Contact']),
+    email: getEmail(p['Email']),
+    phone: getPhone(p['Phone Number']),
+    stage: getSelect(p['Stage']),
+    country: getSelect(p['Country']),
+    buying_maturity: getSelect(p['Buying Maturity']),
+    relationship_strength: getSelect(p['Relationship Strength']),
+    closing: getDate(p['Closing']),
+    linkedin: p['LinkedIn Profile']?.url || ''
+  };
+}
+
+async function notionSearchCRM(params) {
+  const limit = params.limit || 10;
+  const body = { page_size: Math.min(limit * 3, 50), sorts: [{ property: 'Company', direction: 'ascending' }] };
+  if (params.stage) body.filter = { property: 'Stage', select: { equals: params.stage } };
+  const data = await notionApi('/databases/' + NOTION_CRM_DB + '/query', 'POST', body);
+  let results = (data.results || []).map(notionPageToLead);
+  if (params.query) {
+    const q = params.query.toLowerCase();
+    results = results.filter(l => l.company.toLowerCase().includes(q) || l.contact.toLowerCase().includes(q));
+  }
+  return { success: true, count: results.length, leads: results.slice(0, limit) };
+}
+
+async function notionUpdateLead(params) {
+  const props = {};
+  if (params.stage) props['Stage'] = { select: { name: params.stage } };
+  if (params.contact) props['Contact'] = { rich_text: [{ text: { content: params.contact } }] };
+  if (params.email) props['Email'] = { email: params.email };
+  if (params.phone) props['Phone Number'] = { phone_number: params.phone };
+  if (params.closing_date) props['Closing'] = { date: { start: params.closing_date } };
+  if (params.buying_maturity) props['Buying Maturity'] = { select: { name: params.buying_maturity } };
+  if (params.relationship_strength) props['Relationship Strength'] = { select: { name: params.relationship_strength } };
+  const body = { properties: props };
+  if (params.notes) body.children = [{ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: '[FRIDAY ' + new Date().toLocaleDateString() + '] ' + params.notes } }] } }];
+  await notionApi('/pages/' + params.page_id, 'PATCH', body);
+  return { success: true, page_id: params.page_id, updated: Object.keys(props) };
+}
+
+async function notionAddLead(params) {
+  const props = { 'Company': { title: [{ text: { content: params.company } }] } };
+  if (params.contact) props['Contact'] = { rich_text: [{ text: { content: params.contact } }] };
+  if (params.email) props['Email'] = { email: params.email };
+  if (params.phone) props['Phone Number'] = { phone_number: params.phone };
+  if (params.stage) props['Stage'] = { select: { name: params.stage } };
+  if (params.country) props['Country'] = { select: { name: params.country } };
+  const body = { parent: { database_id: NOTION_CRM_DB }, properties: props };
+  if (params.notes) body.children = [{ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: params.notes } }] } }];
+  const result = await notionApi('/pages', 'POST', body);
+  return { success: true, page_id: result.id, url: result.url, company: params.company };
+}
+
+async function notionGetFollowUps(params) {
+  const limit = params.limit || 20;
+  const body = { page_size: limit, sorts: [{ property: 'Company', direction: 'ascending' }] };
+  if (params.stage) body.filter = { property: 'Stage', select: { equals: params.stage } };
+  const data = await notionApi('/databases/' + NOTION_FOLLOWUP_DB + '/query', 'POST', body);
+  const results = (data.results || []).map(notionPageToLead);
+  return { success: true, count: results.length, leads: results };
+}
+
+// ==================== VAULT BROWSE (Obsidian) ====================
+async function vaultBrowse(params) {
+  const folder = (params && params.folder) ? params.folder : '';
+  const path = folder ? `/vault/${encodeURIComponent(folder)}/` : '/vault/';
+  try {
+    const data = await obsidianApi(path, 'GET');
+    const files = (data.files || []).filter(f => f.endsWith('.md') || !f.includes('.'));
+    const notes = files.filter(f => f.endsWith('.md')).map(f => f.replace(/^.*\//, '').replace('.md', ''));
+    const folders = files.filter(f => !f.includes('.'));
+    return { success: true, folder: folder || '(root)', files: notes, subfolders: folders, total: files.length };
+  } catch(e) { return { success: false, error: e.message, folder }; }
+}
+
 async function executeAction(name, params) {
   if (name === 'memory_store') return memoryStore(params);
   if (name === 'memory_search') return memorySearch(params);
@@ -1780,6 +1897,11 @@ async function executeAction(name, params) {
   if (name === 'salesHub_search_contact') return shSearchContact(params);
   if (name === 'salesHub_get_pipeline') return shGetPipeline();
   if (name === 'salesHub_log_activity') return shLogActivity(params);
+  if (name === 'notion_search_crm') return notionSearchCRM(params);
+  if (name === 'notion_update_lead') return notionUpdateLead(params);
+  if (name === 'notion_add_lead') return notionAddLead(params);
+  if (name === 'notion_get_follow_ups') return notionGetFollowUps(params);
+  if (name === 'vault_browse') return vaultBrowse(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: ccHeaders(), body: JSON.stringify({ action: actionName, params: params || {} }) });
   return r.json();
@@ -2211,6 +2333,15 @@ function updateClock() {
 
 async function loadMemoryContext() {
   if (!settings.obsidianKey || !settings.obsidianUrl) return;
+  // Index full vault so FRIDAY knows what files exist outside FRIDAY/Memory
+  try {
+    const root = await obsidianApi('/vault/', 'GET');
+    const allFiles = (root.files || []).filter(f => f.endsWith('.md'));
+    if (allFiles.length > 0) {
+      const folders = [...new Set(allFiles.map(f => f.includes('/') ? f.split('/')[0] : '(root)'))];
+      memoryContext = (memoryContext || '') + '\n=== VAULT INDEX ===\nFolders: ' + folders.join(', ') + '\nTotal notes: ' + allFiles.length + '\nFiles: ' + allFiles.slice(0, 60).join(', ');
+    }
+  } catch(e) {}
   try {
     let contextParts = [];
     try { const profileNote = await memoryRead({ path: 'FRIDAY/Profile.md' }); if (profileNote && profileNote.content) contextParts.push('=== FRIDAY Profile ===\n' + profileNote.content.substring(0, 1000)); } catch(e) {}
