@@ -1469,8 +1469,9 @@ function initAutoSave() {
 }
 
 // ==================== COMMAND CENTER / ACTION EXECUTION (unchanged) ====================
-async function fetchStats() { try { const r = await fetch(settings.ccUrl + '/api/stats'); if (r.ok) { statsData = await r.json(); return true; } } catch(e) {} return false; }
-async function fetchLeads() { try { const r = await fetch(settings.ccUrl + '/api/leads'); if (r.ok) { const raw = await r.json(); leadsData = Array.isArray(raw) ? raw : (raw.leads || []); return true; } } catch(e) {} return false; }
+function ccHeaders() { return { 'Content-Type': 'application/json', 'x-stark-key': 'STARK-779b8576385ed268dd627937628ffb6d' }; }
+async function fetchStats() { try { const r = await fetch(settings.ccUrl + '/api/stats', { headers: ccHeaders() }); if (r.ok) { statsData = await r.json(); return true; } } catch(e) {} return false; }
+async function fetchLeads() { try { const r = await fetch(settings.ccUrl + '/api/leads', { headers: ccHeaders() }); if (r.ok) { const raw = await r.json(); leadsData = Array.isArray(raw) ? raw : (raw.leads || []); return true; } } catch(e) {} return false; }
 
 async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
   if (!settings.obsidianKey) throw new Error('Obsidian not configured — add your API key in Settings.');
@@ -1760,7 +1761,7 @@ async function executeAction(name, params) {
   if (name === 'salesHub_get_pipeline') return shGetPipeline();
   if (name === 'salesHub_log_activity') return shLogActivity(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
-  const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionName, params: params || {} }) });
+  const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: ccHeaders(), body: JSON.stringify({ action: actionName, params: params || {} }) });
   return r.json();
 }
 
