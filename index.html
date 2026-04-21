@@ -788,6 +788,7 @@ body::after {
     <div class="stat-row"><span>Web Search</span><span class="stat-val red" id="web-status">OFFLINE</span></div>
     <div class="stat-row"><span>Obsidian</span><span class="stat-val red" id="obsidian-status">OFFLINE</span></div>
     <div class="stat-row"><span>SalesHub</span><span class="stat-val orange" id="saleshub-status">--</span></div>
+    <div class="stat-row"><span>LinkedIn Manager</span><span class="stat-val orange" id="linkedin-mgr-status">--</span></div>
   </div>
   <div class="panel-box">
     <div class="panel-title">Pipeline</div>
@@ -844,6 +845,7 @@ body::after {
     <div class="connector-pill"><span class="dot" id="dot-outlook"></span>OUTLOOK</div>
     <div class="connector-pill"><span class="dot" id="dot-gmail"></span>GMAIL</div>
     <div class="connector-pill"><span class="dot" id="dot-saleshub"></span>SALESHUB</div>
+    <div class="connector-pill"><span class="dot" id="dot-linkedin-mgr"></span>LINKEDIN MGR</div>
   </div>
 </div>
 
@@ -1315,7 +1317,69 @@ const TOOLS = [
   { name: 'notion_add_lead', description: 'Add a new company/lead to the Purple Lakes CRM in Notion.', input_schema: { type: 'object', properties: { company: { type: 'string', description: 'Company name (required)' }, contact: { type: 'string', description: 'Contact person name' }, email: { type: 'string', description: 'Email address' }, phone: { type: 'string', description: 'Phone number' }, stage: { type: 'string', description: 'Stage: Qualified, Discovery, Demo, Proposal, etc.' }, country: { type: 'string', description: 'Country' }, notes: { type: 'string', description: 'Initial notes' } }, required: ['company'] } },
   { name: 'notion_get_follow_ups', description: 'Get entries from the Purple Lakes Follow Up database in Notion — leads in the nurture/follow-up pipeline.', input_schema: { type: 'object', properties: { stage: { type: 'string', description: 'Filter by stage: Qualified, Discovery, Demo, Proposal, Contract, Nurture' }, limit: { type: 'number', default: 20 } } } },
   // ── Vault browse (Obsidian) ──
-  { name: 'vault_browse', description: 'List all files in a folder of the Obsidian vault. Use with folder="" to list root vault contents. Helps discover notes that are not in FRIDAY/Memory.', input_schema: { type: 'object', properties: { folder: { type: 'string', description: 'Vault folder path to list, e.g. "" for root, "Projects", "Clients". Leave empty for root.' } } } },
+  { name: 'vault_browse', description: 'List all files in a folder of the Obsidian vault. Use with folder="" to list root vault contents. Helps discover notes that are not in FRIDAY/Memory.', input_schema: { type: 'object', properties: { folder: { type: 'string', description: 'Vault folder path to list, e.g. "" for root, "Projects", "Clients". Leave empty for root.' } } } },,
+  // ── LinkedIn Manager ──────────────────────────────────────────────────
+  {
+    name: 'linkedin_get_queue',
+    description: 'Get briefs queued for LinkedIn post generation.',
+    input_schema: { type: 'object', properties: { limit: { type: 'number', default: 10 } } }
+  },
+  {
+    name: 'linkedin_add_brief',
+    description: 'Add a new brief/topic to the LinkedIn post queue. Use when Laurence says "add this to the LinkedIn queue", "queue up a post about X", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        brief: { type: 'string', description: 'The topic or idea for the post' },
+        pillar: { type: 'string', description: 'Content pillar: Auto | Industry Trend | Founder Story | Customer Win | Emotional/Relatable', default: 'Auto' },
+        priority: { type: 'string', description: 'Normal | High | Low', default: 'Normal' },
+        notes: { type: 'string', description: 'Optional extra context', default: '' }
+      },
+      required: ['brief']
+    }
+  },
+  {
+    name: 'linkedin_get_posts',
+    description: 'Get LinkedIn posts by status. Use when Laurence asks what posts are ready, pending review, approved, or published.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'ready_to_review | approved | published | skipped. Omit for all.' }
+      }
+    }
+  },
+  {
+    name: 'linkedin_approve_post',
+    description: 'Approve a LinkedIn post so it is ready to be published.',
+    input_schema: {
+      type: 'object',
+      properties: { post_id: { type: 'string', description: 'UUID of the post to approve' } },
+      required: ['post_id']
+    }
+  },
+  {
+    name: 'linkedin_skip_post',
+    description: 'Skip/reject a LinkedIn post.',
+    input_schema: {
+      type: 'object',
+      properties: { post_id: { type: 'string', description: 'UUID of the post to skip' } },
+      required: ['post_id']
+    }
+  },
+  {
+    name: 'linkedin_mark_published',
+    description: 'Mark a LinkedIn post as published after Laurence has posted it manually on LinkedIn.',
+    input_schema: {
+      type: 'object',
+      properties: { post_id: { type: 'string', description: 'UUID of the post' } },
+      required: ['post_id']
+    }
+  },
+  {
+    name: 'linkedin_pipeline_status',
+    description: 'Get a summary of the full LinkedIn content pipeline — counts by status.',
+    input_schema: { type: 'object', properties: {} }
+  }
 ];
 
 // ==================== SYSTEM PROMPT ====================
@@ -1878,6 +1942,80 @@ async function vaultBrowse(params) {
   } catch(e) { return { success: false, error: e.message, folder }; }
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  LINKEDIN MANAGER — Supabase Bridge
+// ═══════════════════════════════════════════════════════════════
+const LI_URL = 'https://fqmfdtvskxhmzrjjxbko.supabase.co';
+const LI_KEY = 'sb_publishable_LTU7kasB-qZx6faLkNnTeQ_s_Q5Y3jt';
+
+async function liApi(method, table, qs = '', body = null) {
+  const r = await fetch(`${LI_URL}/rest/v1/${table}${qs}`, {
+    method,
+    headers: {
+      'apikey': LI_KEY,
+      'Authorization': `Bearer ${LI_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': (method === 'POST' || method === 'PATCH') ? 'return=representation' : ''
+    },
+    body: body ? JSON.stringify(body) : null
+  });
+  if (!r.ok) throw new Error(await r.text());
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+
+async function linkedinGetQueue(params) {
+  const limit = params?.limit || 10;
+  const data = await liApi('GET', 'linkedin_briefs', `?status=eq.Queued&order=priority.desc,created_at.asc&limit=${limit}`);
+  return { count: data.length, briefs: data.map(b => ({ id: b.id, brief: b.brief, pillar: b.pillar, priority: b.priority, notes: b.notes })) };
+}
+
+async function linkedinAddBrief(params) {
+  const data = await liApi('POST', 'linkedin_briefs', '', {
+    brief: params.brief,
+    pillar: params.pillar || 'Auto',
+    priority: params.priority || 'Normal',
+    notes: params.notes || '',
+    status: 'Queued'
+  });
+  const id = Array.isArray(data) ? data[0]?.id : data?.id;
+  return { success: true, id, message: `Brief added to queue: "${params.brief}"` };
+}
+
+async function linkedinGetPosts(params) {
+  const qs = params?.status ? `?status=eq.${params.status}&order=date.desc&limit=20` : '?order=date.desc&limit=20';
+  const data = await liApi('GET', 'linkedin_posts', qs);
+  return { count: data.length, posts: data.map(p => ({ id: p.id, date: p.date, pillar: p.pillar, status: p.status, preview: (p.content || '').substring(0, 120) + '…' })) };
+}
+
+async function linkedinApprovePost(params) {
+  await liApi('PATCH', 'linkedin_posts', `?id=eq.${params.post_id}`, { status: 'approved' });
+  return { success: true, message: `Post ${params.post_id} approved.` };
+}
+
+async function linkedinSkipPost(params) {
+  await liApi('PATCH', 'linkedin_posts', `?id=eq.${params.post_id}`, { status: 'skipped' });
+  return { success: true, message: `Post ${params.post_id} skipped.` };
+}
+
+async function linkedinMarkPublished(params) {
+  await liApi('PATCH', 'linkedin_posts', `?id=eq.${params.post_id}`, { status: 'published' });
+  return { success: true, message: `Post ${params.post_id} marked as published.` };
+}
+
+async function linkedinPipelineStatus() {
+  const [briefs, posts] = await Promise.all([
+    liApi('GET', 'linkedin_briefs', '?select=status'),
+    liApi('GET', 'linkedin_posts', '?select=status,date,pillar&order=date.desc&limit=30')
+  ]);
+  const bCount = { Queued: 0, Skipped: 0 };
+  briefs.forEach(b => { bCount[b.status] = (bCount[b.status] || 0) + 1; });
+  const pCount = {};
+  posts.forEach(p => { pCount[p.status] = (pCount[p.status] || 0) + 1; });
+  return { briefs: bCount, posts: pCount, recent: posts.slice(0, 5).map(p => ({ date: p.date, pillar: p.pillar, status: p.status })) };
+}
+
 async function executeAction(name, params) {
   if (name === 'memory_store') return memoryStore(params);
   if (name === 'memory_search') return memorySearch(params);
@@ -1902,6 +2040,14 @@ async function executeAction(name, params) {
   if (name === 'notion_add_lead') return notionAddLead(params);
   if (name === 'notion_get_follow_ups') return notionGetFollowUps(params);
   if (name === 'vault_browse') return vaultBrowse(params);
+  // LinkedIn Manager
+  if (name === 'linkedin_get_queue')       return linkedinGetQueue(params);
+  if (name === 'linkedin_add_brief')       return linkedinAddBrief(params);
+  if (name === 'linkedin_get_posts')       return linkedinGetPosts(params);
+  if (name === 'linkedin_approve_post')    return linkedinApprovePost(params);
+  if (name === 'linkedin_skip_post')       return linkedinSkipPost(params);
+  if (name === 'linkedin_mark_published')  return linkedinMarkPublished(params);
+  if (name === 'linkedin_pipeline_status') return linkedinPipelineStatus();
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: ccHeaders(), body: JSON.stringify({ action: actionName, params: params || {} }) });
   return r.json();
@@ -1949,6 +2095,23 @@ function updatePanels(ccOnline) {
   const dotOutlook = document.getElementById('dot-outlook');
   if (settings.outlookToken) { outlookEl.textContent = 'ONLINE'; outlookEl.className = 'stat-val green'; dotOutlook.className = 'dot online'; }
   else { outlookEl.textContent = 'OFFLINE'; outlookEl.className = 'stat-val red'; dotOutlook.className = 'dot'; }
+
+  // LinkedIn Manager status check
+  const liEl = document.getElementById('linkedin-mgr-status');
+  const dotLi = document.getElementById('dot-linkedin-mgr');
+  if (liEl) {
+    liEl.textContent = 'TESTING...'; liEl.className = 'stat-val orange';
+    (async () => {
+      try {
+        await liApi('GET', 'linkedin_briefs', '?limit=1&select=id');
+        liEl.textContent = 'ONLINE'; liEl.className = 'stat-val green';
+        if (dotLi) dotLi.className = 'dot online';
+      } catch(e) {
+        liEl.textContent = 'OFFLINE'; liEl.className = 'stat-val red';
+        if (dotLi) dotLi.className = 'dot';
+      }
+    })();
+  }
 
   // SalesHub status check
   const shEl = document.getElementById('saleshub-status');
