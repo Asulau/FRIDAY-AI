@@ -1263,6 +1263,18 @@ const TOOLS = [
       }
     }
   },
+  {
+    name: 'publish_to_linkedin',
+    description: 'Publish a post directly to the Arenzo LinkedIn company page. Use when Laurence asks to post on LinkedIn, publish content, or push an approved post live. The post goes live immediately on linkedin.com/company/arenzo. Max 3000 characters.',
+    input_schema: {
+      type: 'object',
+      required: ['postContent'],
+      properties: {
+        postContent: { type: 'string', description: 'The full text of the LinkedIn post (max 3000 chars)' },
+        pillar: { type: 'string', description: 'Content pillar label, e.g. "thought-leadership", "product", "social-proof"', default: 'general' }
+      }
+    }
+  },
   // ── SalesHub (Base44) tools ──
   {
     name: 'salesHub_get_contacts',
@@ -1412,7 +1424,7 @@ Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity
-RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nSCRAPER RULE: Use trigger_lead_scraper when Laurence asks to scrape leads, run Hunter/Snov/Minelead/Prospeo/Apify, or wants fresh contacts beyond the Vibe Prospecting workflow. This runs the backup multi-source scraper directly.`;
+RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nSCRAPER RULE: Use trigger_lead_scraper when Laurence asks to scrape leads, run Hunter/Snov/Minelead/Prospeo/Apify, or wants fresh contacts beyond the Vibe Prospecting workflow. This runs the backup multi-source scraper directly.\nLINKEDIN RULE: Use publish_to_linkedin when Laurence asks to post on LinkedIn, publish a post, or push content live on the Arenzo company page. Posts go live immediately — always confirm the content before publishing.`;
   }
 
   const recentLeads = leadsData.slice(0, 5).map(l => ({
@@ -2034,6 +2046,29 @@ async function linkedinPipelineStatus() {
   return { briefs: bCount, posts: pCount, recent: posts.slice(0, 5).map(p => ({ date: p.date, pillar: p.pillar, status: p.status })) };
 }
 
+async function publishToLinkedIn(params) {
+  const WEBHOOK_URL = 'https://arenzo.app.n8n.cloud/webhook/linkedin-publish';
+  try {
+    const r = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postContent: params.postContent,
+        pillar: params.pillar || 'general',
+        date: new Date().toISOString().split('T')[0]
+      })
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      return { success: false, error: 'LinkedIn webhook returned ' + r.status + ': ' + txt.substring(0, 200) };
+    }
+    const result = await r.json();
+    return { success: true, message: 'Post published live on linkedin.com/company/arenzo', publishedAt: result.publishedAt };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
 async function triggerLeadScraper(params) {
   const WEBHOOK_URL = 'https://arenzo.app.n8n.cloud/webhook/friday-run-scraper';
   try {
@@ -2084,6 +2119,7 @@ async function executeAction(name, params) {
   if (name === 'linkedin_skip_post')       return linkedinSkipPost(params);
   if (name === 'linkedin_mark_published')  return linkedinMarkPublished(params);
   if (name === 'linkedin_pipeline_status') return linkedinPipelineStatus();
+  if (name === 'publish_to_linkedin') return publishToLinkedIn(params);
   if (name === 'trigger_lead_scraper') return triggerLeadScraper(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: ccHeaders(), body: JSON.stringify({ action: actionName, params: params || {} }) });
