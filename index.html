@@ -1012,6 +1012,12 @@ body::after {
       <input type="password" id="set-saleshub-key" placeholder="794f2a31...">
     </div>
     <hr>
+    <h2>◆ n8n Automation</h2>
+    <div class="setting-group">
+      <label>n8n API Key <span style="font-size:11px;opacity:.6;">(n8n Settings → API → Create API Key)</span></label>
+      <input type="password" id="set-n8n-key" placeholder="eyJhbGci...">
+    </div>
+    <hr>
     <h2>◆ Notion</h2>
     <div class="setting-group">
       <label>Notion Integration Token <span style="font-size:11px;opacity:.6;">(notion.so → Settings → Connections → Develop integrations)</span></label>
@@ -1252,6 +1258,16 @@ const TOOLS = [
   { name: 'send_next_step', description: 'Send next sequence step to all leads due for follow-up.', input_schema: { type: 'object', properties: { businessDays: { type: 'number' }, dryRun: { type: 'boolean' } } } },
   { name: 'update_template', description: 'Update email sequence template step in CC.', input_schema: { type: 'object', properties: { step: { type: 'number' }, subjectTemplate: { type: 'string' }, bodyPrompt: { type: 'string' }, cta: { type: 'string' }, senderName: { type: 'string' }, senderRole: { type: 'string' }, senderEmail: { type: 'string' }, signature: { type: 'string' }, formattingRules: { type: 'string' } } } },
   { name: 'activate_leads', description: 'Activate existing leads by changing status (e.g. HOLD → NEW).', input_schema: { type: 'object', properties: { fromStatus: { type: 'string', default: 'HOLD' }, toStatus: { type: 'string', default: 'NEW' }, limit: { type: 'number', default: 50 } } } },
+  {
+    name: 'trigger_lead_scraper',
+    description: 'Trigger the lead scraper n8n workflow on-demand. This runs Hunter, Snov.io, Minelead, Prospeo, and Apify LinkedIn scrapers against the brand list in Google Sheets and saves new leads. Use when Laurence asks to scrape leads, run the scraper, find new leads via Hunter/Snov, or wants to extend the pipeline with fresh contacts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: 'Optional note about why scrape is being triggered' }
+      }
+    }
+  },
   // ── SalesHub (Base44) tools ──
   {
     name: 'salesHub_get_contacts',
@@ -1401,7 +1417,7 @@ Asana:${settings.asanaPat?'ON':'OFF'} Web:${settings.braveKey?'ON':'OFF'} Memory
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity
-RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).`;
+RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nSCRAPER RULE: Use trigger_lead_scraper when Laurence asks to scrape leads, run Hunter/Snov/Minelead/Prospeo/Apify, or wants fresh contacts beyond the Vibe Prospecting workflow. This runs the backup multi-source scraper directly.`;
   }
 
   const recentLeads = leadsData.slice(0, 5).map(l => ({
@@ -1493,6 +1509,7 @@ async function loadSettings() {
   document.getElementById('set-outlook-token').value = settings.outlookToken || '';
   document.getElementById('set-outlook-email').value = settings.outlookEmail || '';
   document.getElementById('set-saleshub-key').value = settings.salesHubKey || '';
+  document.getElementById('set-n8n-key').value = settings.n8nKey || '';
   document.getElementById('set-notif-enabled').value = settings.notifEnabled || 'on';
   document.getElementById('set-notif-interval').value = settings.notifInterval || 30;
 }
@@ -1538,6 +1555,7 @@ function readSettingsFromDOM() {
   settings.outlookToken = (document.getElementById('set-outlook-token').value || '').trim();
   settings.outlookEmail = (document.getElementById('set-outlook-email').value || '').trim();
   settings.salesHubKey = (document.getElementById('set-saleshub-key').value || '').trim();
+  settings.n8nKey = (document.getElementById('set-n8n-key').value || '').trim();
   settings.notifEnabled = document.getElementById('set-notif-enabled').value;
   settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
 }
@@ -1560,7 +1578,7 @@ let _autoSaveInitialized = false;
 function initAutoSave() {
   if (_autoSaveInitialized) return;
   _autoSaveInitialized = true;
-  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-saleshub-key'];
+  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-saleshub-key','set-n8n-key'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -2023,6 +2041,27 @@ async function linkedinPipelineStatus() {
   return { briefs: bCount, posts: pCount, recent: posts.slice(0, 5).map(p => ({ date: p.date, pillar: p.pillar, status: p.status })) };
 }
 
+async function triggerLeadScraper(params) {
+  const N8N_URL = 'https://arenzo.app.n8n.cloud/api/v1/workflows/Ov9lHZXbkI0NYJ4s/execute';
+  const key = settings.n8nKey;
+  if (!key) return { success: false, error: 'n8n API key not set — add it in Settings → n8n Automation.' };
+  try {
+    const r = await fetch(N8N_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({})
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      return { success: false, error: 'n8n returned ' + r.status + ': ' + txt.substring(0, 200) };
+    }
+    const data = await r.json();
+    return { success: true, message: 'Scraper triggered. Hunter, Snov.io, Minelead, Prospeo and Apify are now running. Results will land in Google Sheets automatically.', executionId: data.data?.executionId || data.executionId || 'started' };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
 async function executeAction(name, params) {
   if (name === 'memory_store') return memoryStore(params);
   if (name === 'memory_search') return memorySearch(params);
@@ -2055,6 +2094,7 @@ async function executeAction(name, params) {
   if (name === 'linkedin_skip_post')       return linkedinSkipPost(params);
   if (name === 'linkedin_mark_published')  return linkedinMarkPublished(params);
   if (name === 'linkedin_pipeline_status') return linkedinPipelineStatus();
+  if (name === 'trigger_lead_scraper') return triggerLeadScraper(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: ccHeaders(), body: JSON.stringify({ action: actionName, params: params || {} }) });
   return r.json();
