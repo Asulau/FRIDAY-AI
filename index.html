@@ -1504,7 +1504,6 @@ async function loadSettings() {
   document.getElementById('set-outlook-token').value = settings.outlookToken || '';
   document.getElementById('set-outlook-email').value = settings.outlookEmail || '';
   document.getElementById('set-saleshub-key').value = settings.salesHubKey || '';
-  document.getElementById('set-n8n-key').value = settings.n8nKey || '';
   document.getElementById('set-notif-enabled').value = settings.notifEnabled || 'on';
   document.getElementById('set-notif-interval').value = settings.notifInterval || 30;
 }
@@ -1550,7 +1549,6 @@ function readSettingsFromDOM() {
   settings.outlookToken = (document.getElementById('set-outlook-token').value || '').trim();
   settings.outlookEmail = (document.getElementById('set-outlook-email').value || '').trim();
   settings.salesHubKey = (document.getElementById('set-saleshub-key').value || '').trim();
-  settings.n8nKey = (document.getElementById('set-n8n-key').value || '').trim();
   settings.notifEnabled = document.getElementById('set-notif-enabled').value;
   settings.notifInterval = parseInt(document.getElementById('set-notif-interval').value) || 30;
 }
@@ -1573,7 +1571,7 @@ let _autoSaveInitialized = false;
 function initAutoSave() {
   if (_autoSaveInitialized) return;
   _autoSaveInitialized = true;
-  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-saleshub-key','set-n8n-key'];
+  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-saleshub-key'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
