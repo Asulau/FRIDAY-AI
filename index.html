@@ -1012,11 +1012,6 @@ body::after {
       <input type="password" id="set-saleshub-key" placeholder="794f2a31...">
     </div>
     <hr>
-    <h2>◆ n8n Automation</h2>
-    <div class="setting-group">
-      <label>n8n API Key <span style="font-size:11px;opacity:.6;">(n8n Settings → API → Create API Key)</span></label>
-      <input type="password" id="set-n8n-key" placeholder="eyJhbGci...">
-    </div>
     <hr>
     <h2>◆ Notion</h2>
     <div class="setting-group">
@@ -2042,21 +2037,18 @@ async function linkedinPipelineStatus() {
 }
 
 async function triggerLeadScraper(params) {
-  const N8N_URL = 'https://arenzo.app.n8n.cloud/api/v1/workflows/Ov9lHZXbkI0NYJ4s/execute';
-  const key = settings.n8nKey;
-  if (!key) return { success: false, error: 'n8n API key not set — add it in Settings → n8n Automation.' };
+  const WEBHOOK_URL = 'https://arenzo.app.n8n.cloud/webhook/friday-run-scraper';
   try {
-    const r = await fetch(N8N_URL, {
+    const r = await fetch(WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'FRIDAY', note: params?.note || '' })
     });
     if (!r.ok) {
       const txt = await r.text();
-      return { success: false, error: 'n8n returned ' + r.status + ': ' + txt.substring(0, 200) };
+      return { success: false, error: 'Scraper webhook returned ' + r.status + ': ' + txt.substring(0, 200) };
     }
-    const data = await r.json();
-    return { success: true, message: 'Scraper triggered. Hunter, Snov.io, Minelead, Prospeo and Apify are now running. Results will land in Google Sheets automatically.', executionId: data.data?.executionId || data.executionId || 'started' };
+    return { success: true, message: 'Scraper triggered. Hunter, Snov.io, Minelead, Prospeo and Apify are now running. Results land in Google Sheets automatically — usually takes 2-3 minutes.' };
   } catch(e) {
     return { success: false, error: e.message };
   }
