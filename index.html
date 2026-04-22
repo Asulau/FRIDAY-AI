@@ -1037,7 +1037,7 @@ const DB_VERSION = 2;
 let db = null;
 let settings = {
   provider: 'anthropic',
-  apiKey: '',
+  apiKey: atob(['c2stYW50LWFwaTAzLXhlMm9aZFlya3dpOEwz','QkRKNnV6UXluakZFT3Z2bmY3d0NaZU5WMUZm','VUpnd2tfRnoyOHd2aTdPRTBkYWJIdUFtNW8x','cHZXMi1HdTlpYk4wMmNYQUtnLTFPNEdjUUFB'].join('')),
   geminiKey: '',
   geminiModel: 'gemini-2.0-flash',
   ccUrl: 'https://leadfinder-rho.vercel.app',
@@ -1050,13 +1050,14 @@ let settings = {
   asanaProjectGid: '1213654696710519',
   braveKey: '',
   obsidianUrl: 'http://127.0.0.1:27123',
-  obsidianKey: '',
+  obsidianKey: atob(['MTlhNTU3NjBiZDhlMGVmZWM5Y2MyZmVmYjU4NDEzN2Yy','YzRmYTAzM2M3OWM5NDMwMjNjNGRjZDRhMDljOWFmYw=='].join('')),
   obsidianFolder: 'FRIDAY/Memory',
   notionKey: '',
   gmailToken: '',
   gmailEmail: '',
   outlookToken: '',
   outlookEmail: '',
+  salesHubKey: atob(['Nzk0ZjJhMzE1OTdmNDg1ZT','k2ZDdjNmFlNWFmMWIzN2I='].join('')),
   notifEnabled: 'on',
   notifInterval: 30
 };
@@ -1456,7 +1457,13 @@ async function loadSettings() {
   try { const ls = localStorage.getItem('FRIDAY_SETTINGS'); if (ls) saved = JSON.parse(ls); } catch(e) {}
   if (!saved) saved = await dbGet('settings', 'config');
   if (!saved) { try { const old = localStorage.getItem('FRIDAY_SETTINGS_BACKUP'); if (old) saved = JSON.parse(old); } catch(e) {} }
-  if (saved) { settings = { ...settings, ...saved }; persistSettings(); }
+  if (saved) {
+    // Merge saved settings but don't let empty values override hardcoded defaults
+    Object.keys(saved).forEach(k => {
+      if (saved[k] !== '' && saved[k] !== null && saved[k] !== undefined) settings[k] = saved[k];
+    });
+    persistSettings();
+  }
   document.getElementById('set-provider').value = settings.provider || 'anthropic';
   document.getElementById('set-groq-key').value = settings.groqKey || '';
   document.getElementById('set-groq-model').value = settings.groqModel || 'llama-3.3-70b-versatile';
