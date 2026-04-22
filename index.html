@@ -2505,6 +2505,21 @@ async function loadMemoryContext() {
       memoryContext = (memoryContext || '') + '\n=== VAULT INDEX ===\nFolders: ' + folders.join(', ') + '\nTotal notes: ' + allFiles.length + '\nFiles: ' + allFiles.slice(0, 60).join(', ');
     }
   } catch(e) {}
+  // Create & read KeepHub CC outreach leads backup folder + campaign log
+  try {
+    const CC_FOLDER = 'KeepHub CC outreach leads backup';
+    const LOG_PATH = CC_FOLDER + '/Campaign Log.md';
+    let logExists = false;
+    try { await obsidianApi('/vault/' + encodeURIComponent(LOG_PATH), 'GET'); logExists = true; } catch(e) {}
+    if (!logExists) {
+      const logContent = `---\ncreated: 2026-04-21\ntags: ["keephub", "outreach", "campaign"]\n---\n\n# KeepHub CC Outreach — Campaign Log\n\n## Last Campaign: April 21, 2026\n- **Emails sent:** ~214 leads contacted (mix of Step 1 initial + Step 2 follow-ups)\n- **Total leads in CC:** 294\n- **Bounced:** ~25 (flagged in pipeline)\n- **Replied:** 2 (Dennis @ SOVA — not interested Q2, follow up Q4; Thon Holding — not relevant)\n- **Last batch time:** ~13:30 UTC April 21 2026\n- **Next action:** Send Step 2 follow-ups to Step 1 leads with no reply; send Step 3 to Step 2 leads\n\n## CC Pipeline\n- Storage: GitHub (data/leads.json — Asulau/LEADFINDER)\n- CC URL: https://leadfinder-rho.vercel.app\n- Auth key: stored in FRIDAY settings\n\n## Sequence Status\n- Most contacts are on Step 1 or Step 2\n- Follow-up gap: 3 business days between steps\n- Max 6 steps per contact\n- Next send window: April 24–25, 2026\n\n## Notes\n- Vercel Blob suspended April 22 — migrated to GitHub file storage (permanent fix)\n- 294 leads recovered from Gmail sent history + Nordic retail CSV\n`;
+      await obsidianApi('/vault/' + encodeURIComponent(LOG_PATH), 'PUT', logContent, 'text/markdown');
+    }
+    const logNote = await obsidianApi('/vault/' + encodeURIComponent(LOG_PATH), 'GET');
+    if (logNote && logNote.content) {
+      memoryContext = (memoryContext || '') + '\n=== CC CAMPAIGN LOG ===\n' + logNote.content.substring(0, 1500);
+    }
+  } catch(e) { console.log('[FRIDAY] Campaign log init failed:', e.message); }
   try {
     let contextParts = [];
     try { const profileNote = await memoryRead({ path: 'FRIDAY/Profile.md' }); if (profileNote && profileNote.content) contextParts.push('=== FRIDAY Profile ===\n' + profileNote.content.substring(0, 1000)); } catch(e) {}
@@ -2540,7 +2555,7 @@ async function saveSessionSummary() {
 
 async function proactiveBriefing() {
   if (!getActiveKey()) return;
-  const briefingPrompt = `Give me a concise morning briefing. Pull the pipeline summary from SalesHub, check CC status, and surface anything that needs attention today. Be direct, max 4 lines. No bullet points.`;
+  const briefingPrompt = `Give me a concise morning briefing. Check the CC pipeline status, note when the last email campaign was sent and what follow-ups are due based on the 3-day gap rule. Pull the pipeline summary from SalesHub if available. Surface the single most important thing to act on today. Be direct, max 4 lines. No bullet points.`;
   orbState = 'thinking';
   const typingDiv = document.createElement('div');
   typingDiv.className = 'msg friday';
