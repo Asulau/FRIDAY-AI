@@ -2676,6 +2676,100 @@ function addMsg(type, text, tools) {
   document.getElementById('mem-msgs').textContent = messageCount;
 }
 
+
+// ==================== PROACTIVE FOLLOW-UP ENGINE ====================
+let pendingFollowUps = [];
+
+const FOLLOWUP_PATTERNS = [
+  // "within 2-3 minutes" → use max value
+  { re: /within (\d+)[-–](\d+)\s*minute/i,   delay: (m) => parseInt(m[2]) * 60 * 1000 },
+  { re: /in (\d+)\s*minute/i,                 delay: (m) => parseInt(m[1]) * 60 * 1000 },
+  { re: /in a (moment|sec|second)/i,           delay: () => 3 * 60 * 1000 },
+  { re: /check(?: back| the pipeline| on this)?(?:\s+\w+)? in a moment/i, delay: () => 3 * 60 * 1000 },
+  { re: /shortly/i,                            delay: () => 2 * 60 * 1000 },
+  { re: /give it (\d+)[- ](\d+) min/i,         delay: (m) => parseInt(m[2]) * 60 * 1000 },
+  { re: /follow[- ]?up in/i,                   delay: () => 3 * 60 * 1000 },
+  { re: /check[- ]back in/i,                   delay: () => 3 * 60 * 1000 },
+  { re: /let me know in/i,                     delay: () => 3 * 60 * 1000 },
+];
+
+function detectFollowUpDelay(text) {
+  for (const p of FOLLOWUP_PATTERNS) {
+    const m = text.match(p.re);
+    if (m) return p.delay(m);
+  }
+  return null;
+}
+
+function scheduleFollowUp(fridayText, context) {
+  const delay = detectFollowUpDelay(fridayText);
+  if (!delay) return;
+
+  const id = Date.now();
+  const fireAt = Date.now() + delay;
+  const mins = Math.round(delay / 60000);
+
+  // Show a subtle scheduled indicator in chat
+  const indicator = document.createElement('div');
+  indicator.id = 'followup-' + id;
+  indicator.style.cssText = 'font-size:10px;color:var(--cyan-dim,#1a5f6a);padding:4px 12px;opacity:.7;font-family:monospace;letter-spacing:.05em;';
+  indicator.innerHTML = `◈ SCHEDULED CHECK — ${mins}m <span style="float:right;cursor:pointer;opacity:.5;" onclick="cancelFollowUp(${id})">✕ cancel</span>`;
+  document.getElementById('chat').appendChild(indicator);
+
+  const timer = setTimeout(async () => {
+    // Remove indicator
+    const ind = document.getElementById('followup-' + id);
+    if (ind) ind.remove();
+    pendingFollowUps = pendingFollowUps.filter(f => f.id !== id);
+
+    // Show Friday is checking
+    const checkDiv = document.createElement('div');
+    checkDiv.className = 'msg friday';
+    checkDiv.id = 'autonomous-typing-' + id;
+    checkDiv.innerHTML = '<div class="msg-label">F.R.I.D.A.Y.</div><span style="opacity:.6;">◈ Running scheduled check...</span>';
+    document.getElementById('chat').appendChild(checkDiv);
+    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+
+    // Build autonomous trigger message (injected as assistant context, not user visible)
+    const triggerMsg = `[AUTONOMOUS FOLLOW-UP] You said you would check back. Context from your last response: "${fridayText.substring(0, 300)}". Please check now — run whatever tools are needed to follow through — and report the result to Laurence proactively.`;
+
+    // Inject into conversation as a silent system nudge
+    conversationHistory.push({ role: 'user', content: triggerMsg });
+    let result;
+    try {
+      result = await callClaude(triggerMsg);
+    } catch(e) {
+      result = { text: 'Follow-up check failed: ' + e.message, tools: [] };
+    }
+
+    const at = document.getElementById('autonomous-typing-' + id);
+    if (at) at.remove();
+
+    // Remove the injected trigger from visible history so chat stays clean
+    conversationHistory = conversationHistory.filter(m =>
+      !(m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[AUTONOMOUS FOLLOW-UP]'))
+    );
+
+    orbState = 'speaking';
+    addMsg('friday', '🔄 ' + result.text, result.tools);
+    speak(result.text);
+    setTimeout(() => { orbState = 'idle'; }, 4000);
+    if (db) {
+      const tx = db.transaction('history', 'readwrite');
+      tx.objectStore('history').add({ user: '[AUTO CHECK]', friday: result.text, tools: result.tools, time: Date.now() });
+    }
+  }, delay);
+
+  pendingFollowUps.push({ id, timer, fireAt });
+}
+
+function cancelFollowUp(id) {
+  const f = pendingFollowUps.find(x => x.id === id);
+  if (f) { clearTimeout(f.timer); pendingFollowUps = pendingFollowUps.filter(x => x.id !== id); }
+  const ind = document.getElementById('followup-' + id);
+  if (ind) ind.remove();
+}
+
 async function sendMessage() {
   const input = document.getElementById('input');
   const msg = input.value.trim();
@@ -2693,6 +2787,7 @@ async function sendMessage() {
   if (t) t.remove();
   orbState = 'speaking';
   addMsg('friday', result.text, result.tools);
+  scheduleFollowUp(result.text, msg);
   speak(result.text);
   triggerSessionSave();
   setTimeout(() => { orbState = 'idle'; }, 4000);
