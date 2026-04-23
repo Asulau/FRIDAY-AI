@@ -1279,6 +1279,17 @@ const TOOLS = [
     }
   },
   {
+    name: 'sync_saleshub_to_cc',
+    description: 'Fetch ALL SalesHub contacts that have email addresses and push them into the Command Center pipeline. Only use when Laurence explicitly asks to sync SalesHub contacts to the CC, push SalesHub emails to the pipeline, or import SalesHub leads. NEVER run automatically.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status_filter: { type: 'string', description: 'Optional: only sync contacts with this status (new/contacted/qualified/customer). Leave empty for all.' },
+        limit: { type: 'number', description: 'Max contacts to sync (default 500)', default: 500 }
+      }
+    }
+  },
+  {
     name: 'hunter_domain_search',
     description: 'Find email addresses at a company domain using Hunter.io. Returns verified and guessed emails with confidence scores. Use to get contact emails for a specific company. Requires Hunter.io API key in Settings (free: 25 searches/month at hunter.io).',
     input_schema: {
@@ -1485,8 +1496,8 @@ Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v)
 Asana:${settings.asanaPat?'ON':'OFF'} Web:ON Memory:${settings.obsidianKey?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
-Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity
-RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nLEAD SOURCING RULE: When Laurence asks for new leads, fresh contacts, or to extend the pipeline — use ALL available channels in sequence:
+Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity, sync_saleshub_to_cc, linkedin_prospect_search, hunter_domain_search
+SALESHUB SYNC RULE: When Laurence asks to push SalesHub contacts to the CC, import SalesHub emails, or sync SalesHub to the pipeline — immediately call sync_saleshub_to_cc({}). Never say you lack the tool or ask Laurence to do it manually.\nRULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nLEAD SOURCING RULE: When Laurence asks for new leads, fresh contacts, or to extend the pipeline — use ALL available channels in sequence:
 1. linkedin_prospect_search({titles:["retail director","head of retail","HR director"],locations:["Sweden","Norway","Denmark","Finland"]}) — finds real LinkedIn profiles via Google. Works immediately, no credentials needed.
 2. If Hunter.io key is set: hunter_domain_search({domain:"company.com"}) on each company found — pulls verified emails and auto-pushes to CC.
 3. trigger_lead_scraper() — fires the n8n Vibe Prospecting pipeline for bulk Nordic retail prospects.
@@ -2244,6 +2255,71 @@ async function publishToLinkedIn(params) {
   }
 }
 
+async function syncSalesHubToCC(params) {
+  const CC_KEY = 'STARK-779b8576385ed268dd627937628ffb6d';
+  const limit = params?.limit || 500;
+  const statusFilter = params?.status_filter || null;
+
+  // 1. Fetch all SalesHub contacts
+  let all;
+  try {
+    all = await salesHubApi('Contact', 'GET', null, { limit });
+  } catch(e) {
+    return { success: false, error: 'Could not fetch SalesHub contacts: ' + e.message };
+  }
+
+  // 2. Filter: must have email, optionally filter by status
+  let withEmail = all.filter(c => c.email && c.email.includes('@'));
+  if (statusFilter) withEmail = withEmail.filter(c => c.status === statusFilter);
+
+  if (withEmail.length === 0) {
+    return { success: false, message: `No SalesHub contacts with email addresses found${statusFilter ? ' (status: '+statusFilter+')' : ''}. Total contacts checked: ${all.length}.` };
+  }
+
+  // 3. Map to CC lead format
+  const leads = withEmail.map(c => ({
+    firstName: c.first_name || '',
+    lastName:  c.last_name  || '',
+    fullName:  ((c.first_name||'') + ' ' + (c.last_name||'')).trim() || c.company || '',
+    email:     c.email,
+    title:     c.job_title  || '',
+    company:   c.company    || '',
+    phone:     c.phone      || '',
+    hasEmail:  true,
+    emailVerified: false,
+    source:    'SalesHub CRM',
+    scrapedAt: new Date().toISOString()
+  }));
+
+  // 4. Push to CC in batches of 50
+  const batchSize = 50;
+  let pushed = 0, failed = 0;
+  for (let i = 0; i < leads.length; i += batchSize) {
+    const batch = leads.slice(i, i + batchSize);
+    try {
+      const r = await fetch(`${settings.ccUrl}/api/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-stark-key': CC_KEY },
+        body: JSON.stringify({ leads: batch, source: 'SalesHub CRM' })
+      });
+      if (r.ok) pushed += batch.length;
+      else { failed += batch.length; console.warn('[SalesHub→CC] Batch failed:', r.status, await r.text()); }
+    } catch(e) {
+      failed += batch.length;
+      console.warn('[SalesHub→CC] Batch error:', e.message);
+    }
+  }
+
+  return {
+    success: pushed > 0,
+    total_in_saleshub: all.length,
+    had_email: withEmail.length,
+    pushed_to_cc: pushed,
+    failed: failed,
+    message: `Synced ${pushed} SalesHub contacts with emails to the Command Center.${failed > 0 ? ' '+failed+' failed.' : ''} Pipeline should update within seconds.`
+  };
+}
+
 async function linkedinProspectSearch(params) {
   const titles = (params.titles || ['retail director', 'head of retail', 'HR director']).join(' OR ');
   const locations = (params.locations || ['Sweden', 'Norway', 'Denmark', 'Finland']).join(' OR ');
@@ -2462,6 +2538,7 @@ async function executeAction(name, params) {
   if (name === 'cc_pipeline_status') return ccPipelineStatus();
   if (name === 'publish_to_linkedin') return publishToLinkedIn(params);
   if (name === 'trigger_lead_scraper') return triggerLeadScraper(params);
+  if (name === 'sync_saleshub_to_cc') return syncSalesHubToCC(params);
   if (name === 'linkedin_prospect_search') return linkedinProspectSearch(params);
   if (name === 'hunter_domain_search') return hunterDomainSearch(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
