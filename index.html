@@ -1059,6 +1059,8 @@ let settings = {
   outlookToken: '',
   outlookEmail: '',
   salesHubKey: atob(['Nzk0ZjJhMzE1OTdmNDg1ZT','k2ZDdjNmFlNWFmMWIzN2I='].join('')),
+  hunterKey: '',
+  apifyToken: '',
   notifEnabled: 'on',
   notifInterval: 30
 };
@@ -1264,6 +1266,31 @@ const TOOLS = [
     }
   },
   {
+    name: 'linkedin_prospect_search',
+    description: 'Search LinkedIn for Nordic retail decision makers using Google. Returns real LinkedIn profile URLs, names, titles, and companies. Use when Laurence asks to find prospects, search for contacts, or wants new leads from LinkedIn. Works immediately — no extra credentials needed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        titles: { type: 'array', items: { type: 'string' }, description: 'Job titles to search for, e.g. ["retail director","head of retail","HR director"]' },
+        locations: { type: 'array', items: { type: 'string' }, description: 'Countries or cities, e.g. ["Sweden","Norway","Denmark","Finland"]' },
+        industry: { type: 'string', description: 'Industry keyword, e.g. "fashion retail"', default: 'retail' },
+        count: { type: 'number', description: 'Number of results to return (default 15)', default: 15 }
+      }
+    }
+  },
+  {
+    name: 'hunter_domain_search',
+    description: 'Find email addresses at a company domain using Hunter.io. Returns verified and guessed emails with confidence scores. Use to get contact emails for a specific company. Requires Hunter.io API key in Settings (free: 25 searches/month at hunter.io).',
+    input_schema: {
+      type: 'object',
+      required: ['domain'],
+      properties: {
+        domain: { type: 'string', description: 'Company domain, e.g. "hm.com" or "ikea.com"' },
+        title_filter: { type: 'string', description: 'Optional: filter by job title keyword, e.g. "director"' }
+      }
+    }
+  },
+  {
     name: 'publish_to_linkedin',
     description: 'Publish a post directly to the Arenzo LinkedIn company page. Use when Laurence asks to post on LinkedIn, publish content, or push an approved post live. The post goes live immediately on linkedin.com/company/arenzo. Max 3000 characters.',
     input_schema: {
@@ -1459,7 +1486,11 @@ Asana:${settings.asanaPat?'ON':'OFF'} Web:ON Memory:${settings.obsidianKey?'ON':
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity
-RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nSCRAPER RULE: Use trigger_lead_scraper when Laurence asks to scrape leads, run Hunter/Snov/Minelead/Prospeo/Apify, or wants fresh contacts beyond the Vibe Prospecting workflow. This runs the backup multi-source scraper directly.\nRESEARCH RULE: When Laurence asks for research, competitor analysis, market research, or any "find out about X" task — execute it fully in one response:
+RULE: Never tell Laurence to manually perform any action you have a tool for. CC tools are direct API calls — use them immediately.\nHOLD RULE: Never use deploy_scout for HOLD leads. Call activate_leads({fromStatus:'HOLD',limit:N}) then send_emails({limit:N}).\nLEAD SOURCING RULE: When Laurence asks for new leads, fresh contacts, or to extend the pipeline — use ALL available channels in sequence:
+1. linkedin_prospect_search({titles:["retail director","head of retail","HR director"],locations:["Sweden","Norway","Denmark","Finland"]}) — finds real LinkedIn profiles via Google. Works immediately, no credentials needed.
+2. If Hunter.io key is set: hunter_domain_search({domain:"company.com"}) on each company found — pulls verified emails and auto-pushes to CC.
+3. trigger_lead_scraper() — fires the n8n Vibe Prospecting pipeline for bulk Nordic retail prospects.
+Always run linkedin_prospect_search first as it works right now. Chain all three for maximum coverage. Report total new profiles/contacts found.\nRESEARCH RULE: When Laurence asks for research, competitor analysis, market research, or any "find out about X" task — execute it fully in one response:
 (1) Run 5-8 web_search calls with varied queries covering different angles.
 (2) Use web_read on the 3-5 most relevant URLs to get full content.
 (3) Synthesise all findings into a structured markdown note.
@@ -2213,6 +2244,126 @@ async function publishToLinkedIn(params) {
   }
 }
 
+async function linkedinProspectSearch(params) {
+  const titles = (params.titles || ['retail director', 'head of retail', 'HR director']).join(' OR ');
+  const locations = (params.locations || ['Sweden', 'Norway', 'Denmark', 'Finland']).join(' OR ');
+  const industry = params.industry || 'retail';
+  const count = params.count || 15;
+
+  // Multiple targeted queries for better coverage
+  const queries = [
+    `site:linkedin.com/in (${titles}) (${locations}) ${industry} -jobs -apply`,
+    `site:linkedin.com/in "${industry} director" OR "${industry} manager" (${locations}) -jobs`,
+  ];
+
+  const results = [];
+  for (const query of queries) {
+    try {
+      const r = await webSearch({ query, count: Math.ceil(count / queries.length) });
+      if (r && r.results) {
+        r.results.forEach(item => {
+          // Extract name from LinkedIn URL/title pattern
+          const urlMatch = (item.url || '').match(/linkedin\.com\/in\/([^/?]+)/);
+          const slug = urlMatch ? urlMatch[1].replace(/-/g, ' ') : '';
+          results.push({
+            url: item.url || '',
+            title: item.title || '',
+            snippet: item.description || item.snippet || '',
+            slug: slug
+          });
+        });
+      }
+    } catch(e) {}
+  }
+
+  // Deduplicate by URL
+  const seen = new Set();
+  const unique = results.filter(r => {
+    if (!r.url || seen.has(r.url)) return false;
+    seen.add(r.url); return true;
+  });
+
+  if (unique.length === 0) {
+    return { found: 0, message: 'No LinkedIn profiles found for those criteria. Try broader titles or locations.', profiles: [] };
+  }
+
+  return {
+    found: unique.length,
+    message: `Found ${unique.length} LinkedIn profiles matching ${titles} in ${locations}`,
+    profiles: unique,
+    next_step: 'Use hunter_domain_search on their company domains to get email addresses, then push to CC via the API.'
+  };
+}
+
+async function hunterDomainSearch(params) {
+  const key = settings.hunterKey;
+  if (!key) {
+    return {
+      error: 'Hunter.io API key not set. Go to hunter.io, create a free account (25 searches/month), get your API key, and add it in Friday Settings under "Hunter.io Key".',
+      setup_url: 'https://hunter.io/api-keys'
+    };
+  }
+
+  const domain = (params.domain || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+  if (!domain) return { error: 'No domain provided' };
+
+  try {
+    const url = `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=20&api_key=${key}`;
+    const r = await fetch(url);
+    const data = await r.json();
+
+    if (data.errors) return { error: data.errors[0]?.details || 'Hunter.io error', domain };
+
+    const emails = (data.data?.emails || []);
+    const filtered = params.title_filter
+      ? emails.filter(e => (e.position||'').toLowerCase().includes(params.title_filter.toLowerCase()))
+      : emails;
+
+    // Format clean output
+    const contacts = filtered.map(e => ({
+      email: e.value,
+      name: `${e.first_name||''} ${e.last_name||''}`.trim(),
+      title: e.position || '',
+      confidence: e.confidence,
+      verified: e.verification?.status === 'valid'
+    })).filter(c => c.email);
+
+    // Auto-push verified contacts to CC if key is set
+    const pushed = [];
+    for (const c of contacts.filter(c => c.verified && c.name)) {
+      try {
+        const CC_KEY = 'STARK-779b8576385ed268dd627937628ffb6d';
+        const ccRes = await fetch(`${settings.ccUrl}/api/leads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-stark-key': CC_KEY },
+          body: JSON.stringify({ leads: [{
+            firstName: c.name.split(' ')[0] || '',
+            lastName: c.name.split(' ').slice(1).join(' ') || '',
+            email: c.email, title: c.title, company: data.data?.organization || domain,
+            domain: domain, hasEmail: true, emailVerified: true,
+            source: 'Hunter.io', scrapedAt: new Date().toISOString()
+          }]})
+        });
+        if (ccRes.ok) pushed.push(c.email);
+      } catch(e) {}
+    }
+
+    return {
+      domain,
+      organization: data.data?.organization || domain,
+      total_found: data.data?.total || 0,
+      contacts_returned: contacts.length,
+      contacts,
+      pushed_to_cc: pushed.length,
+      message: contacts.length > 0
+        ? `Found ${contacts.length} contacts at ${domain}. ${pushed.length} verified ones pushed to CC.`
+        : `No contacts found at ${domain} — Hunter may not have data for this domain yet.`
+    };
+  } catch(e) {
+    return { error: 'Hunter.io request failed: ' + e.message, domain };
+  }
+}
+
 async function triggerLeadScraper(params) {
   // Primary: Vibe Prospecting → Google Sheets workflow (Nordic retail, region-aware)
   const VP_WEBHOOK = 'https://arenzo.app.n8n.cloud/webhook/52dc6da5-ba75-4788-90c5-026b8bfc13fb';
@@ -2311,6 +2462,8 @@ async function executeAction(name, params) {
   if (name === 'cc_pipeline_status') return ccPipelineStatus();
   if (name === 'publish_to_linkedin') return publishToLinkedIn(params);
   if (name === 'trigger_lead_scraper') return triggerLeadScraper(params);
+  if (name === 'linkedin_prospect_search') return linkedinProspectSearch(params);
+  if (name === 'hunter_domain_search') return hunterDomainSearch(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
   const r = await fetch(settings.ccUrl + '/api/action', { method: 'POST', headers: ccHeaders(), body: JSON.stringify({ action: actionName, params: params || {} }) });
   return r.json();
