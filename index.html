@@ -1078,11 +1078,19 @@ body::after {
       <textarea id="set-profile-goals" rows="3" placeholder="e.g. close 10 enterprise deals, launch v2 by June..."></textarea>
     </div>
     <hr>
-    <h2>◆ Cloud Memory Bank</h2>
+    <h2>◆ Memory Bank</h2>
     <div class="setting-group">
-      <label>Memory Folder</label>
+      <label>Obsidian REST API URL</label>
+      <input type="text" id="set-obsidian-url" placeholder="http://127.0.0.1:27123">
+    </div>
+    <div class="setting-group">
+      <label>Obsidian API Key</label>
+      <input type="password" id="set-obsidian-key" placeholder="Your Obsidian REST API key">
+    </div>
+    <div class="setting-group">
+      <label>Memory Vault Folder</label>
       <input type="text" id="set-obsidian-folder" placeholder="FRIDAY/Memory">
-      <small style="color:#888;font-size:11px">Memory is stored securely in the cloud — works on all devices.</small>
+      <small style="color:#888;font-size:11px">Writes to Obsidian (desktop) and syncs to cloud — memory works on all devices.</small>
     </div>
     <hr>
     <h2>◆ Email Integrations</h2>
@@ -1171,7 +1179,7 @@ let settings = {
   asanaProjectGid: '1213654696710519',
   braveKey: '',
   obsidianUrl: 'http://127.0.0.1:27123',
-  // obsidianKey removed — memory now stored in cloud via /api/memory
+  obsidianKey: atob(['MTlhNTU3NjBiZDhlMGVmZWM5Y2MyZmVmYjU4NDEzN2Yy','YzRmYTAzM2M3OWM5NDMwMjNjNGRjZDRhMDljOWFmYw=='].join('')),
   obsidianFolder: 'FRIDAY/Memory',
   notionKey: '',
   gmailToken: '',
@@ -1633,7 +1641,7 @@ function buildSystemPrompt() {
     return `You are FRIDAY, Laurence's AI assistant. Warm, direct, British. Act don't describe. Chain tools (up to 12 per response). 1-3 sentence replies max. No filler words.
 
 Pipeline: ${totalLeads} leads | ${Object.entries(byStatus).map(([k,v])=>k+':'+v).join(', ')}
-Asana:${settings.asanaPat?'ON':'OFF'} Web:ON Memory:${settings.ccUrl?'CLOUD':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
+Asana:${settings.asanaPat?'ON':'OFF'} Web:ON Memory:${(settings.obsidianKey||settings.ccUrl)?'ON':'OFF'} Gmail:${settings.gmailToken?'ON':'OFF'} Outlook:${settings.outlookToken?'ON':'OFF'}
 Context: KeepHub frontline employee optimisation platform. Focus: streamlining operations, customer experience, frontline efficiency. 6-step outreach sequence.
 ${memoryContext ? 'Memory: '+memoryContext.substring(0,300) : ''}
 Tools: deploy_scout, send_emails, list_leads, update_lead, get_lead_detail, refresh_data, get_templates, get_pipeline, get_email_history, update_template, get_send_limits, add_note, mark_replied, check_replies, get_pipeline_summary, get_scout_config, save_scout_config, list_gmail, read_gmail, send_gmail, list_outlook, read_outlook, send_outlook, web_search, web_read, memory_store, memory_search, memory_read, memory_list, memory_traverse, salesHub_get_contacts, salesHub_update_contact, salesHub_search_contact, salesHub_get_pipeline, salesHub_log_activity, sync_saleshub_to_cc, linkedin_prospect_search, hunter_domain_search
@@ -1670,7 +1678,7 @@ How you respond:
 ${(settings.profileName || settings.profileRole || settings.profileGoals) ? '## About ' + (settings.profileName || 'Laurence') + '\n' + (settings.profileRole ? 'Role: ' + settings.profileRole + '\n' : '') + (settings.profileStyle ? 'Communication style: ' + settings.profileStyle + '\n' : '') + (settings.profileProjects ? 'Key projects : ' + settings.profileProjects + '\n' : '') + (settings.profileGoals ? 'Goals: ' + settings.profileGoals + '\n' : '') + '\n' : ''}
 Pipeline: ${totalLeads} leads | ${JSON.stringify(byStatus)}
 Recent: ${JSON.stringify(recentLeads)}
-Asana:${settings.asanaPat?'LIVE':'OFF'} Web:LIVE Memory:${settings.ccUrl?'CLOUD ('+settings.obsidianFolder+')':'OFF'} Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
+Asana:${settings.asanaPat?'LIVE':'OFF'} Web:LIVE Memory:${settings.obsidianKey&&settings.ccUrl?'SYNC':''}${settings.obsidianKey&&!settings.ccUrl?'LOCAL':''}${!settings.obsidianKey&&settings.ccUrl?'CLOUD':''}${!settings.obsidianKey&&!settings.ccUrl?'OFF':''} (${settings.obsidianFolder||'FRIDAY/Memory'}) Gmail:${settings.gmailToken?'LIVE':'OFF'} Outlook:${settings.outlookToken?'LIVE':'OFF'}
 ${memoryContext ? 'Memory context: '+memoryContext.substring(0,800) : ''}\nAuto-learn: If Laurence shares important personal facts, preferences or business context, proactively call memory_store to save them to FRIDAY/Profile.
 ${lastSessionSummary ? 'Last session: '+lastSessionSummary.substring(0,400) : ''}
 KeepHub: Frontline employee optimisation platform. Streamline operations, improve customer experience, boost frontline efficiency. 6-step outreach.
@@ -1728,6 +1736,8 @@ async function loadSettings() {
   document.getElementById('set-model').value = settings.model || 'claude-sonnet-4-20250514';
   document.getElementById('set-brave-key').value = settings.braveKey || '';
   document.getElementById('set-notion-key').value = settings.notionKey || '';
+  document.getElementById('set-obsidian-url').value = settings.obsidianUrl || 'http://127.0.0.1:27123';
+  document.getElementById('set-obsidian-key').value = settings.obsidianKey || '';
   document.getElementById('set-obsidian-folder').value = settings.obsidianFolder || 'FRIDAY/Memory';
   document.getElementById('set-profile-name').value = settings.profileName || 'Laurence';
   document.getElementById('set-profile-role').value = settings.profileRole || '';
@@ -1773,6 +1783,8 @@ function readSettingsFromDOM() {
   settings.model = document.getElementById('set-model').value;
   settings.braveKey = (document.getElementById('set-brave-key').value || '').trim();
   settings.notionKey = (document.getElementById('set-notion-key').value || '').trim();
+  settings.obsidianUrl = (document.getElementById('set-obsidian-url').value || '').trim() || 'http://127.0.0.1:27123';
+  settings.obsidianKey = (document.getElementById('set-obsidian-key').value || '').trim();
   settings.obsidianFolder = (document.getElementById('set-obsidian-folder').value || '').trim() || 'FRIDAY/Memory';
   settings.profileName = (document.getElementById('set-profile-name').value || '').trim() || 'Laurence';
   settings.profileRole = (document.getElementById('set-profile-role').value || '').trim();
@@ -1808,7 +1820,7 @@ let _autoSaveInitialized = false;
 function initAutoSave() {
   if (_autoSaveInitialized) return;
   _autoSaveInitialized = true;
-  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-bridge-url','set-bridge-token','set-saleshub-key'];
+  const ids = ['set-provider','set-gemini-key','set-gemini-model','set-api-key','set-cc-url','set-eleven-key','set-voice-id','set-asana-pat','set-asana-project','set-model','set-brave-key','set-obsidian-url','set-obsidian-key','set-obsidian-folder','set-gmail-token','set-gmail-email','set-outlook-token','set-outlook-email','set-notif-enabled','set-notif-interval','set-bridge-url','set-bridge-token','set-saleshub-key'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -1828,135 +1840,187 @@ function ccHeaders() { return { 'Content-Type': 'application/json', 'x-stark-key
 async function fetchStats() { try { const r = await fetch(settings.ccUrl + '/api/stats', { headers: ccHeaders() }); if (r.ok) { statsData = await r.json(); return true; } } catch(e) {} return false; }
 async function fetchLeads() { try { const r = await fetch(settings.ccUrl + '/api/leads', { headers: ccHeaders() }); if (r.ok) { const raw = await r.json(); leadsData = Array.isArray(raw) ? raw : (raw.leads || []); return true; } } catch(e) {} return false; }
 
-// ── Cloud Memory API (replaces local Obsidian) ────────────────────────────────
-// ── Cloud Memory API ──────────────────────────────────────────────────────────
-// Backend response shapes (actual):
+// ═══════════════════════════════════════════════════════════════
+//  MEMORY — Dual-write: Obsidian (desktop) + Cloud (all devices)
+//  READ:  try Obsidian first → fall back to cloud
+//  WRITE: write to Obsidian (if available) AND cloud in parallel
+// ═══════════════════════════════════════════════════════════════
+
+// ── Obsidian local REST API ───────────────────────────────────────────────────
+async function obsidianApi(endpoint, method = 'GET', body = null, contentType = 'application/json') {
+  if (!settings.obsidianKey) throw new Error('Obsidian not configured — add your API key in Settings.');
+  const opts = { method, headers: { 'Authorization': 'Bearer ' + settings.obsidianKey, 'Content-Type': contentType, 'Accept': 'application/json' } };
+  if (body) opts.body = (contentType === 'application/json') ? JSON.stringify(body) : body;
+  const base = settings.obsidianUrl || 'http://127.0.0.1:27123';
+  const candidates = new Set([base, 'http://127.0.0.1:27123', 'http://localhost:27123', 'https://127.0.0.1:27124', 'https://localhost:27124']);
+  let lastErr = null;
+  for (const baseUrl of candidates) {
+    try {
+      const r = await fetch(baseUrl + endpoint, { ...opts, signal: AbortSignal.timeout(4000) });
+      if (!r.ok) { const err = await r.text(); throw new Error('Obsidian API error (' + r.status + '): ' + err.substring(0, 200)); }
+      const text = await r.text();
+      if (baseUrl !== settings.obsidianUrl) { settings.obsidianUrl = baseUrl; persistSettings(); }
+      try { return JSON.parse(text); } catch(e) { return { content: text }; }
+    } catch(e) { lastErr = e; if (e.message.includes('Obsidian API error')) throw e; continue; }
+  }
+  throw new Error('Obsidian unreachable: ' + (lastErr ? lastErr.message.substring(0, 80) : ''));
+}
+
+// ── Cloud memory API ──────────────────────────────────────────────────────────
+// Backend response shapes:
 //   GET /api/memory         → { success, count, keys: [{ key, modified, size }] }
 //   GET /api/memory?key=xxx → { success, key, entry: { content, folder, modified } }
-//   POST /api/memory        → { success, key, size }
-//   DELETE /api/memory?key  → { success, deleted }
+//   POST / DELETE           → { success, ... }
 //
-// cloudMemoryApi normalises these so callers always get:
+// cloudMemoryApi normalises:
 //   GET (no key)  → Array of { key, modified, size }
-//   GET (with key)→ Entry object { content, folder, modified } or null if not found
-//   POST/DELETE   → raw response
+//   GET (with key)→ Entry object { content, folder, modified } or null
 async function cloudMemoryApi(method, key, content, folder) {
   const base = (settings.ccUrl || '').replace(/\/$/, '');
-  if (!base) throw new Error('CC URL not configured in Settings.');
+  if (!base) throw new Error('CC URL not configured.');
   const hdrs = ccHeaders();
-
   if (method === 'GET') {
     if (key) {
-      // Single entry lookup → { success, key, entry: { content, folder, modified } }
       const r = await fetch(`${base}/api/memory?key=${encodeURIComponent(key)}`, { headers: hdrs });
       if (r.status === 404) return null;
-      if (!r.ok) throw new Error('Memory API error ' + r.status);
+      if (!r.ok) throw new Error('Cloud memory error ' + r.status);
       const d = await r.json();
-      return d.entry || null;  // normalised: just the entry object
+      return d.entry || null;
     } else {
-      // List all keys → { success, count, keys: [{ key, modified, size }] }
       const r = await fetch(`${base}/api/memory`, { headers: hdrs });
-      if (!r.ok) throw new Error('Memory API error ' + r.status);
+      if (!r.ok) throw new Error('Cloud memory error ' + r.status);
       const d = await r.json();
-      return d.keys || [];  // normalised: array of { key, modified, size }
+      return d.keys || [];
     }
   }
-
   if (method === 'POST') {
-    const r = await fetch(`${base}/api/memory`, {
-      method: 'POST', headers: hdrs,
-      body: JSON.stringify({ key, content, folder: folder || '' })
-    });
-    if (!r.ok) throw new Error('Memory write error ' + r.status);
+    const r = await fetch(`${base}/api/memory`, { method: 'POST', headers: hdrs, body: JSON.stringify({ key, content, folder: folder || '' }) });
+    if (!r.ok) throw new Error('Cloud memory write error ' + r.status);
     return r.json();
   }
-
   if (method === 'DELETE') {
     const r = await fetch(`${base}/api/memory?key=${encodeURIComponent(key)}`, { method: 'DELETE', headers: hdrs });
-    if (!r.ok) throw new Error('Memory delete error ' + r.status);
+    if (!r.ok) throw new Error('Cloud memory delete error ' + r.status);
     return r.json();
   }
 }
 
+// ── Dual-write helper ─────────────────────────────────────────────────────────
+// Writes content to cloud always; writes to Obsidian if key is set (fire-and-forget)
+async function memoryWrite(obsidianPath, content, cloudKey, cloudFolder) {
+  // Always sync to cloud
+  const cloudPromise = settings.ccUrl ? cloudMemoryApi('POST', cloudKey, content, cloudFolder).catch(e => console.log('Cloud sync failed:', e.message)) : Promise.resolve();
+  // Write to Obsidian if configured (desktop only)
+  const obsidianPromise = settings.obsidianKey
+    ? obsidianApi(`/vault/${encodeURIComponent(obsidianPath)}`, 'PUT', content, 'text/markdown').catch(e => console.log('Obsidian write failed:', e.message))
+    : Promise.resolve();
+  await Promise.all([cloudPromise, obsidianPromise]);
+}
+
+// ── Read helper ───────────────────────────────────────────────────────────────
+// Tries Obsidian first (fast on desktop), falls back to cloud (works everywhere)
+async function memoryReadRaw(obsidianPath, cloudKey) {
+  if (settings.obsidianKey) {
+    try {
+      const d = await obsidianApi(`/vault/${encodeURIComponent(obsidianPath)}`, 'GET');
+      return d.content || '';
+    } catch(e) { /* fall through to cloud */ }
+  }
+  // Cloud fallback
+  const entry = await cloudMemoryApi('GET', cloudKey);
+  return (entry && entry.content) ? entry.content : null;
+}
+
+// ── Public memory functions ───────────────────────────────────────────────────
 async function memoryStore(params) {
   const folder = settings.obsidianFolder || 'FRIDAY/Memory';
   const safeName = params.title.replace(/[\/\\:*?"<>|]/g, '-');
-  const key = `${folder}/${safeName}`;
+  const obsPath = `${folder}/${safeName}.md`;
+  const cloudKey = `${folder}/${safeName}`;
   const now = new Date().toISOString();
   const tags = params.tags ? params.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const md = `---\ncreated: ${now}\nupdated: ${now}\ntags: [${tags.map(t => `"${t}"`).join(', ')}]\nsource: FRIDAY\n---\n\n${params.content}`;
-  await cloudMemoryApi('POST', key, md, folder);
-  return { success: true, key, title: params.title, message: `Stored in memory: ${params.title}` };
+  await memoryWrite(obsPath, md, cloudKey, folder);
+  return { success: true, path: obsPath, title: params.title, message: `Stored in memory: ${params.title}` };
 }
 
 async function memorySearch(params) {
   const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+  const q = params.query.toLowerCase();
+  // Try Obsidian search first
+  if (settings.obsidianKey) {
+    try {
+      const results = await obsidianApi('/search/simple/?query=' + encodeURIComponent(params.query), 'POST', null, 'application/json');
+      const filtered = (Array.isArray(results) ? results : []).filter(r => r.filename && r.filename.startsWith(folder)).slice(0, 10);
+      if (filtered.length > 0) return { success: true, query: params.query, count: filtered.length, results: filtered.map(r => ({ path: r.filename, matches: (r.matches || []).map(m => ({ context: (m.match || '').substring(0, 200) })).slice(0, 3) })) };
+    } catch(e) { /* fall through */ }
+  }
+  // Cloud fallback — search by key name
   try {
-    // GET with no key returns array of { key, modified, size } — no content
     const keyList = await cloudMemoryApi('GET', null);
-    const q = params.query.toLowerCase();
-    // Filter by key name match first (fast, no extra requests)
-    const keyMatches = (keyList || []).filter(k => k.key.startsWith(folder) && k.key.toLowerCase().includes(q)).slice(0, 10);
-    // For each match, fetch full content (up to 5 to avoid too many requests)
-    const results = await Promise.all(keyMatches.slice(0, 5).map(async k => {
-      try {
-        const entry = await cloudMemoryApi('GET', k.key);
-        return { path: k.key, matches: [{ context: (entry && entry.content ? entry.content.substring(0, 200) : '') }] };
-      } catch(e) { return { path: k.key, matches: [] }; }
+    const keyMatches = (keyList || []).filter(k => k.key.startsWith(folder) && k.key.toLowerCase().includes(q)).slice(0, 5);
+    const results = await Promise.all(keyMatches.map(async k => {
+      try { const e = await cloudMemoryApi('GET', k.key); return { path: k.key, matches: [{ context: (e && e.content ? e.content.substring(0, 200) : '') }] }; } catch(_) { return { path: k.key, matches: [] }; }
     }));
     return { success: true, query: params.query, count: results.length, results };
   } catch(e) { return { success: false, query: params.query, count: 0, results: [], error: e.message }; }
 }
 
 async function memoryRead(params) {
-  // GET with key returns entry object { content, folder, modified } or null
-  const entry = await cloudMemoryApi('GET', params.path);
-  if (!entry) return { success: false, path: params.path, error: 'Note not found' };
-  return { success: true, path: params.path, content: (entry.content || '').substring(0, 5000) };
+  const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+  // obsidian path = params.path as-is (may include .md or not); cloud key = without .md
+  const cloudKey = params.path.replace(/\.md$/, '');
+  const content = await memoryReadRaw(params.path.endsWith('.md') ? params.path : params.path + '.md', cloudKey);
+  if (content === null) return { success: false, path: params.path, error: 'Note not found' };
+  return { success: true, path: params.path, content: content.substring(0, 5000) };
 }
 
 async function memoryTraverse(params) {
-  const entry = await cloudMemoryApi('GET', params.path);
-  const content = (entry && entry.content) ? entry.content : '';
+  const cloudKey = params.path.replace(/\.md$/, '');
+  const content = await memoryReadRaw(params.path.endsWith('.md') ? params.path : params.path + '.md', cloudKey) || '';
   const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
   const result = { path: params.path, content: content.substring(0, 1500), links, linkCount: links.length };
   if (params.followFirst && links.length > 0) {
     const folder = settings.obsidianFolder || 'FRIDAY/Memory';
-    const firstKey = folder + '/Graph/' + links[0];
-    try {
-      const linked = await cloudMemoryApi('GET', firstKey);
-      if (linked) result.linkedNote = { path: firstKey, content: (linked.content || '').substring(0, 800) };
-    } catch(e) {}
+    const firstObs = `${folder}/Graph/${links[0]}.md`;
+    const firstCloud = `${folder}/Graph/${links[0]}`;
+    try { const c = await memoryReadRaw(firstObs, firstCloud); if (c) result.linkedNote = { path: firstObs, content: c.substring(0, 800) }; } catch(e) {}
   }
   return result;
 }
 
 async function memoryList() {
   const folder = settings.obsidianFolder || 'FRIDAY/Memory';
+  // Try Obsidian first
+  if (settings.obsidianKey) {
+    try {
+      const data = await obsidianApi(`/vault/${encodeURIComponent(folder)}/`, 'GET');
+      const files = (data.files || []).filter(f => f.endsWith('.md'));
+      if (files.length > 0) return { success: true, folder, count: files.length, notes: files.map(f => f.replace(folder + '/', '').replace('.md', '')) };
+    } catch(e) { /* fall through */ }
+  }
+  // Cloud fallback
   try {
-    // GET with no key returns array of { key, modified, size }
     const keyList = await cloudMemoryApi('GET', null);
     const filtered = (keyList || []).filter(k => k.key.startsWith(folder));
     return { success: true, folder, count: filtered.length, notes: filtered.map(k => k.key.replace(folder + '/', '')) };
-  } catch(e) { return { success: true, folder, count: 0, notes: [], message: 'Memory empty or CC URL not configured.' }; }
+  } catch(e) { return { success: true, folder, count: 0, notes: [], message: 'Memory empty or not configured.' }; }
 }
 
 async function autoSaveMemory(userMsg, fridayResponse, toolsUsed) {
-  if (!settings.ccUrl) return;
+  if (!settings.obsidianKey && !settings.ccUrl) return;
   if (toolsUsed.length === 0 && fridayResponse.length < 200) return;
   try {
     const folder = settings.obsidianFolder || 'FRIDAY/Memory';
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
-    const key = `${folder}/Sessions/${dateStr}-log`;
+    const obsPath = `${folder}/Sessions/${dateStr}-log.md`;
+    const cloudKey = `${folder}/Sessions/${dateStr}-log`;
     const logEntry = `\n\n---\n**${now.toLocaleTimeString()}** | Tools: ${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'none'}\n- **User:** ${userMsg.substring(0, 200)}\n- **FRIDAY:** ${fridayResponse.substring(0, 300)}`;
-    // GET with key returns entry object { content } or null
     let existing = '';
-    try { const d = await cloudMemoryApi('GET', key); existing = (d && d.content) ? d.content : ''; } catch(e) {}
-    if (!existing) {
-      existing = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log — ${dateStr}\n`;
-    }
-    await cloudMemoryApi('POST', key, existing + logEntry, folder + '/Sessions');
+    try { existing = await memoryReadRaw(obsPath, cloudKey) || ''; } catch(e) {}
+    if (!existing) existing = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log — ${dateStr}\n`;
+    await memoryWrite(obsPath, existing + logEntry, cloudKey, folder + '/Sessions');
   } catch(e) { console.log('Auto-save memory failed:', e.message); }
 }
 
@@ -3000,9 +3064,17 @@ function updatePanels(ccOnline) {
   else { voiceEl.textContent = 'GOOGLE TTS'; voiceEl.className = 'stat-val green'; }
 
   const obsEl = document.getElementById('obsidian-status');
-  if (settings.ccUrl) {
+  if (settings.obsidianKey || settings.ccUrl) {
     obsEl.textContent = 'TESTING...'; obsEl.className = 'stat-val orange';
-    (async () => { try { await cloudMemoryApi('GET', null); obsEl.textContent = 'ONLINE'; obsEl.className = 'stat-val green'; } catch(e) { obsEl.textContent = 'ERROR'; obsEl.className = 'stat-val red'; } })();
+    (async () => {
+      let obsOk = false, cloudOk = false;
+      if (settings.obsidianKey) { try { await obsidianApi('/vault/', 'GET'); obsOk = true; } catch(e) {} }
+      if (settings.ccUrl) { try { await cloudMemoryApi('GET', null); cloudOk = true; } catch(e) {} }
+      if (obsOk && cloudOk) { obsEl.textContent = 'SYNC'; obsEl.className = 'stat-val green'; }
+      else if (cloudOk) { obsEl.textContent = 'CLOUD'; obsEl.className = 'stat-val green'; }
+      else if (obsOk) { obsEl.textContent = 'LOCAL'; obsEl.className = 'stat-val orange'; }
+      else { obsEl.textContent = 'ERROR'; obsEl.className = 'stat-val red'; }
+    })();
   } else { obsEl.textContent = 'OFFLINE'; obsEl.className = 'stat-val red'; }
 
   const webEl = document.getElementById('web-status');
@@ -3572,40 +3644,52 @@ function updateClock() {
 }
 
 async function loadMemoryContext() {
-  if (!settings.ccUrl) return;
+  if (!settings.obsidianKey && !settings.ccUrl) return;
   try {
-    // GET no key → array of { key, modified, size }
-    const keyList = await cloudMemoryApi('GET', null);
-    if (!Array.isArray(keyList)) return;
+    const folder = settings.obsidianFolder || 'FRIDAY/Memory';
 
-    const allKeys = keyList.map(k => k.key);
-    if (allKeys.length > 0) {
-      const folders = [...new Set(allKeys.map(k => k.includes('/') ? k.split('/')[0] : '(root)'))];
-      memoryContext = (memoryContext || '') + '\n=== MEMORY INDEX ===\nFolders: ' + folders.join(', ') + '\nTotal notes: ' + allKeys.length + '\nKeys: ' + allKeys.slice(0, 40).join(', ');
-    }
-
-    // Seed campaign log if not yet in memory
-    const LOG_KEY = 'KeepHub CC outreach leads backup/Campaign Log';
-    const logExists = allKeys.includes(LOG_KEY);
-    if (!logExists) {
-      const logContent = `---\ncreated: 2026-04-21\ntags: ["keephub", "outreach", "campaign"]\n---\n\n# KeepHub CC Outreach — Campaign Log\n\n## Last Campaign: April 21, 2026\n- **Emails sent:** ~214 leads contacted (mix of Step 1 initial + Step 2 follow-ups)\n- **Total leads in CC:** 294\n- **Bounced:** ~25 (flagged in pipeline)\n- **Replied:** 2 (Dennis @ SOVA — not interested Q2, follow up Q4; Thon Holding — not relevant)\n- **Next action:** Send Step 2 follow-ups to Step 1 leads; send Step 3 to Step 2 leads\n\n## CC Pipeline\n- Storage: GitHub (data/leads.json — Asulau/LEADFINDER)\n- CC URL: https://leadfinder-rho.vercel.app\n\n## Notes\n- Vercel Blob suspended April 22 — migrated to GitHub file storage\n- 294 leads recovered from Gmail sent history + Nordic retail CSV\n`;
-      try { await cloudMemoryApi('POST', LOG_KEY, logContent, 'KeepHub CC outreach leads backup'); } catch(e) {}
-    } else {
-      // Fetch and load the campaign log into context
+    // Index: try Obsidian vault first, then cloud
+    let allKeys = [];
+    if (settings.obsidianKey) {
       try {
-        const entry = await cloudMemoryApi('GET', LOG_KEY);
-        if (entry && entry.content) memoryContext = (memoryContext || '') + '\n=== CC CAMPAIGN LOG ===\n' + entry.content.substring(0, 1500);
-      } catch(e) {}
+        const root = await obsidianApi('/vault/', 'GET');
+        const allFiles = (root.files || []).filter(f => f.endsWith('.md'));
+        if (allFiles.length > 0) {
+          const folders = [...new Set(allFiles.map(f => f.includes('/') ? f.split('/')[0] : '(root)'))];
+          memoryContext = (memoryContext || '') + '\n=== VAULT INDEX ===\nFolders: ' + folders.join(', ') + '\nTotal notes: ' + allFiles.length + '\nFiles: ' + allFiles.slice(0, 60).join(', ');
+        }
+      } catch(e) { /* offline */ }
+    }
+    if (settings.ccUrl) {
+      try {
+        const keyList = await cloudMemoryApi('GET', null);
+        allKeys = Array.isArray(keyList) ? keyList.map(k => k.key) : [];
+        if (allKeys.length > 0 && !memoryContext.includes('VAULT INDEX')) {
+          const folders = [...new Set(allKeys.map(k => k.includes('/') ? k.split('/')[0] : '(root)'))];
+          memoryContext = (memoryContext || '') + '\n=== CLOUD MEMORY INDEX ===\nFolders: ' + folders.join(', ') + '\nTotal notes: ' + allKeys.length;
+        }
+      } catch(e) { /* cloud unavailable */ }
     }
 
-    // Load profile note
-    let contextParts = [];
+    // Campaign log — seed to cloud if missing
+    const LOG_OBS = 'KeepHub CC outreach leads backup/Campaign Log.md';
+    const LOG_KEY = 'KeepHub CC outreach leads backup/Campaign Log';
+    const logContent = `---\ncreated: 2026-04-21\ntags: ["keephub", "outreach", "campaign"]\n---\n\n# KeepHub CC Outreach — Campaign Log\n\n## Last Campaign: April 21, 2026\n- **Emails sent:** ~214 leads contacted (mix of Step 1 initial + Step 2 follow-ups)\n- **Total leads in CC:** 294\n- **Bounced:** ~25 (flagged in pipeline)\n- **Replied:** 2 (Dennis @ SOVA — not interested Q2, follow up Q4; Thon Holding — not relevant)\n- **Next action:** Send Step 2 follow-ups to Step 1 leads; send Step 3 to Step 2 leads\n\n## CC Pipeline\n- Storage: GitHub (data/leads.json — Asulau/LEADFINDER)\n- CC URL: https://leadfinder-rho.vercel.app\n\n## Notes\n- Vercel Blob suspended April 22 — migrated to GitHub file storage\n- 294 leads recovered from Gmail sent history + Nordic retail CSV\n`;
     try {
-      const profile = await cloudMemoryApi('GET', 'FRIDAY/Profile');
-      if (profile && profile.content) contextParts.push('=== FRIDAY Profile ===\n' + profile.content.substring(0, 1000));
+      const existing = await memoryReadRaw(LOG_OBS, LOG_KEY);
+      if (existing) {
+        memoryContext = (memoryContext || '') + '\n=== CC CAMPAIGN LOG ===\n' + existing.substring(0, 1500);
+      } else {
+        // First time — seed it to cloud
+        await memoryWrite(LOG_OBS, logContent, LOG_KEY, 'KeepHub CC outreach leads backup');
+      }
     } catch(e) {}
 
-    if (contextParts.length > 0) memoryContext = (memoryContext || '') + '\n' + contextParts.join('\n');
+    // Profile note
+    try {
+      const profile = await memoryReadRaw(`${folder}/Profile.md`, `${folder}/Profile`);
+      if (profile) memoryContext = (memoryContext || '') + '\n=== FRIDAY Profile ===\n' + profile.substring(0, 1000);
+    } catch(e) {}
   } catch(e) { console.log('Memory bootstrap failed:', e.message); }
 }
 
