@@ -1829,21 +1829,48 @@ async function fetchStats() { try { const r = await fetch(settings.ccUrl + '/api
 async function fetchLeads() { try { const r = await fetch(settings.ccUrl + '/api/leads', { headers: ccHeaders() }); if (r.ok) { const raw = await r.json(); leadsData = Array.isArray(raw) ? raw : (raw.leads || []); return true; } } catch(e) {} return false; }
 
 // ── Cloud Memory API (replaces local Obsidian) ────────────────────────────────
+// ── Cloud Memory API ──────────────────────────────────────────────────────────
+// Backend response shapes (actual):
+//   GET /api/memory         → { success, count, keys: [{ key, modified, size }] }
+//   GET /api/memory?key=xxx → { success, key, entry: { content, folder, modified } }
+//   POST /api/memory        → { success, key, size }
+//   DELETE /api/memory?key  → { success, deleted }
+//
+// cloudMemoryApi normalises these so callers always get:
+//   GET (no key)  → Array of { key, modified, size }
+//   GET (with key)→ Entry object { content, folder, modified } or null if not found
+//   POST/DELETE   → raw response
 async function cloudMemoryApi(method, key, content, folder) {
   const base = (settings.ccUrl || '').replace(/\/$/, '');
   if (!base) throw new Error('CC URL not configured in Settings.');
   const hdrs = ccHeaders();
+
   if (method === 'GET') {
-    const url = key ? `${base}/api/memory?key=${encodeURIComponent(key)}` : `${base}/api/memory`;
-    const r = await fetch(url, { headers: hdrs });
-    if (!r.ok) throw new Error('Memory API error ' + r.status);
-    return r.json();
+    if (key) {
+      // Single entry lookup → { success, key, entry: { content, folder, modified } }
+      const r = await fetch(`${base}/api/memory?key=${encodeURIComponent(key)}`, { headers: hdrs });
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error('Memory API error ' + r.status);
+      const d = await r.json();
+      return d.entry || null;  // normalised: just the entry object
+    } else {
+      // List all keys → { success, count, keys: [{ key, modified, size }] }
+      const r = await fetch(`${base}/api/memory`, { headers: hdrs });
+      if (!r.ok) throw new Error('Memory API error ' + r.status);
+      const d = await r.json();
+      return d.keys || [];  // normalised: array of { key, modified, size }
+    }
   }
+
   if (method === 'POST') {
-    const r = await fetch(`${base}/api/memory`, { method: 'POST', headers: hdrs, body: JSON.stringify({ key, content, folder: folder || '' }) });
+    const r = await fetch(`${base}/api/memory`, {
+      method: 'POST', headers: hdrs,
+      body: JSON.stringify({ key, content, folder: folder || '' })
+    });
     if (!r.ok) throw new Error('Memory write error ' + r.status);
     return r.json();
   }
+
   if (method === 'DELETE') {
     const r = await fetch(`${base}/api/memory?key=${encodeURIComponent(key)}`, { method: 'DELETE', headers: hdrs });
     if (!r.ok) throw new Error('Memory delete error ' + r.status);
@@ -1865,29 +1892,41 @@ async function memoryStore(params) {
 async function memorySearch(params) {
   const folder = settings.obsidianFolder || 'FRIDAY/Memory';
   try {
-    const data = await cloudMemoryApi('GET', null);
-    const allKeys = Object.keys(data || {});
+    // GET with no key returns array of { key, modified, size } — no content
+    const keyList = await cloudMemoryApi('GET', null);
     const q = params.query.toLowerCase();
-    const matched = allKeys.filter(k => k.startsWith(folder) && (k.toLowerCase().includes(q) || (data[k].content || '').toLowerCase().includes(q))).slice(0, 10);
-    return { success: true, query: params.query, count: matched.length, results: matched.map(k => ({ path: k, matches: [{ context: (data[k].content || '').substring(0, 200) }] })) };
+    // Filter by key name match first (fast, no extra requests)
+    const keyMatches = (keyList || []).filter(k => k.key.startsWith(folder) && k.key.toLowerCase().includes(q)).slice(0, 10);
+    // For each match, fetch full content (up to 5 to avoid too many requests)
+    const results = await Promise.all(keyMatches.slice(0, 5).map(async k => {
+      try {
+        const entry = await cloudMemoryApi('GET', k.key);
+        return { path: k.key, matches: [{ context: (entry && entry.content ? entry.content.substring(0, 200) : '') }] };
+      } catch(e) { return { path: k.key, matches: [] }; }
+    }));
+    return { success: true, query: params.query, count: results.length, results };
   } catch(e) { return { success: false, query: params.query, count: 0, results: [], error: e.message }; }
 }
 
 async function memoryRead(params) {
-  const data = await cloudMemoryApi('GET', params.path);
-  const content = (data && data.content) ? data.content : (typeof data === 'string' ? data : JSON.stringify(data));
-  return { success: true, path: params.path, content: content.substring(0, 5000) };
+  // GET with key returns entry object { content, folder, modified } or null
+  const entry = await cloudMemoryApi('GET', params.path);
+  if (!entry) return { success: false, path: params.path, error: 'Note not found' };
+  return { success: true, path: params.path, content: (entry.content || '').substring(0, 5000) };
 }
 
 async function memoryTraverse(params) {
-  const data = await cloudMemoryApi('GET', params.path);
-  const content = (data && data.content) ? data.content : '';
+  const entry = await cloudMemoryApi('GET', params.path);
+  const content = (entry && entry.content) ? entry.content : '';
   const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1]);
   const result = { path: params.path, content: content.substring(0, 1500), links, linkCount: links.length };
   if (params.followFirst && links.length > 0) {
     const folder = settings.obsidianFolder || 'FRIDAY/Memory';
     const firstKey = folder + '/Graph/' + links[0];
-    try { const linked = await cloudMemoryApi('GET', firstKey); result.linkedNote = { path: firstKey, content: (linked.content || '').substring(0, 800) }; } catch(e) {}
+    try {
+      const linked = await cloudMemoryApi('GET', firstKey);
+      if (linked) result.linkedNote = { path: firstKey, content: (linked.content || '').substring(0, 800) };
+    } catch(e) {}
   }
   return result;
 }
@@ -1895,9 +1934,10 @@ async function memoryTraverse(params) {
 async function memoryList() {
   const folder = settings.obsidianFolder || 'FRIDAY/Memory';
   try {
-    const data = await cloudMemoryApi('GET', null);
-    const keys = Object.keys(data || {}).filter(k => k.startsWith(folder));
-    return { success: true, folder, count: keys.length, notes: keys.map(k => k.replace(folder + '/', '')) };
+    // GET with no key returns array of { key, modified, size }
+    const keyList = await cloudMemoryApi('GET', null);
+    const filtered = (keyList || []).filter(k => k.key.startsWith(folder));
+    return { success: true, folder, count: filtered.length, notes: filtered.map(k => k.key.replace(folder + '/', '')) };
   } catch(e) { return { success: true, folder, count: 0, notes: [], message: 'Memory empty or CC URL not configured.' }; }
 }
 
@@ -1909,13 +1949,14 @@ async function autoSaveMemory(userMsg, fridayResponse, toolsUsed) {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const key = `${folder}/Sessions/${dateStr}-log`;
-    const entry = `\n\n---\n**${now.toLocaleTimeString()}** | Tools: ${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'none'}\n- **User:** ${userMsg.substring(0, 200)}\n- **FRIDAY:** ${fridayResponse.substring(0, 300)}`;
+    const logEntry = `\n\n---\n**${now.toLocaleTimeString()}** | Tools: ${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'none'}\n- **User:** ${userMsg.substring(0, 200)}\n- **FRIDAY:** ${fridayResponse.substring(0, 300)}`;
+    // GET with key returns entry object { content } or null
     let existing = '';
     try { const d = await cloudMemoryApi('GET', key); existing = (d && d.content) ? d.content : ''; } catch(e) {}
     if (!existing) {
       existing = `---\ncreated: ${now.toISOString()}\ntags: ["session-log", "friday"]\nsource: FRIDAY\n---\n\n# FRIDAY Session Log — ${dateStr}\n`;
     }
-    await cloudMemoryApi('POST', key, existing + entry, folder + '/Sessions');
+    await cloudMemoryApi('POST', key, existing + logEntry, folder + '/Sessions');
   } catch(e) { console.log('Auto-save memory failed:', e.message); }
 }
 
@@ -2275,8 +2316,9 @@ async function notionGetFollowUps(params) {
 async function vaultBrowse(params) {
   const prefix = (params && params.folder) ? params.folder : '';
   try {
-    const data = await cloudMemoryApi('GET', null);
-    const allKeys = Object.keys(data || {});
+    // GET no key → array of { key, modified, size }
+    const keyList = await cloudMemoryApi('GET', null);
+    const allKeys = (keyList || []).map(k => k.key);
     const matched = prefix ? allKeys.filter(k => k.startsWith(prefix)) : allKeys;
     const notes = matched.map(k => prefix ? k.replace(prefix + '/', '') : k);
     const subfolders = [...new Set(notes.filter(n => n.includes('/')).map(n => n.split('/')[0]))];
@@ -3532,30 +3574,38 @@ function updateClock() {
 async function loadMemoryContext() {
   if (!settings.ccUrl) return;
   try {
-    // Load all cloud memory keys and seed context
-    const data = await cloudMemoryApi('GET', null);
-    const allKeys = Object.keys(data || {});
+    // GET no key → array of { key, modified, size }
+    const keyList = await cloudMemoryApi('GET', null);
+    if (!Array.isArray(keyList)) return;
+
+    const allKeys = keyList.map(k => k.key);
     if (allKeys.length > 0) {
       const folders = [...new Set(allKeys.map(k => k.includes('/') ? k.split('/')[0] : '(root)'))];
       memoryContext = (memoryContext || '') + '\n=== MEMORY INDEX ===\nFolders: ' + folders.join(', ') + '\nTotal notes: ' + allKeys.length + '\nKeys: ' + allKeys.slice(0, 40).join(', ');
     }
-    // Seed campaign log if not yet saved
+
+    // Seed campaign log if not yet in memory
     const LOG_KEY = 'KeepHub CC outreach leads backup/Campaign Log';
-    if (!data[LOG_KEY]) {
+    const logExists = allKeys.includes(LOG_KEY);
+    if (!logExists) {
       const logContent = `---\ncreated: 2026-04-21\ntags: ["keephub", "outreach", "campaign"]\n---\n\n# KeepHub CC Outreach — Campaign Log\n\n## Last Campaign: April 21, 2026\n- **Emails sent:** ~214 leads contacted (mix of Step 1 initial + Step 2 follow-ups)\n- **Total leads in CC:** 294\n- **Bounced:** ~25 (flagged in pipeline)\n- **Replied:** 2 (Dennis @ SOVA — not interested Q2, follow up Q4; Thon Holding — not relevant)\n- **Next action:** Send Step 2 follow-ups to Step 1 leads; send Step 3 to Step 2 leads\n\n## CC Pipeline\n- Storage: GitHub (data/leads.json — Asulau/LEADFINDER)\n- CC URL: https://leadfinder-rho.vercel.app\n\n## Notes\n- Vercel Blob suspended April 22 — migrated to GitHub file storage\n- 294 leads recovered from Gmail sent history + Nordic retail CSV\n`;
       try { await cloudMemoryApi('POST', LOG_KEY, logContent, 'KeepHub CC outreach leads backup'); } catch(e) {}
-    } else if (data[LOG_KEY] && data[LOG_KEY].content) {
-      memoryContext = (memoryContext || '') + '\n=== CC CAMPAIGN LOG ===\n' + data[LOG_KEY].content.substring(0, 1500);
+    } else {
+      // Fetch and load the campaign log into context
+      try {
+        const entry = await cloudMemoryApi('GET', LOG_KEY);
+        if (entry && entry.content) memoryContext = (memoryContext || '') + '\n=== CC CAMPAIGN LOG ===\n' + entry.content.substring(0, 1500);
+      } catch(e) {}
     }
-    // Load profile + search for key terms
+
+    // Load profile note
     let contextParts = [];
-    if (data['FRIDAY/Profile'] && data['FRIDAY/Profile'].content) contextParts.push('=== FRIDAY Profile ===\n' + data['FRIDAY/Profile'].content.substring(0, 1000));
-    const searchTerms = ['preference', 'contact', 'priority', 'important', 'remember'];
-    for (const term of searchTerms) {
-      const matched = allKeys.filter(k => (data[k].content || '').toLowerCase().includes(term)).slice(0, 2);
-      matched.forEach(k => { if (data[k].content) contextParts.push((data[k].content || '').substring(0, 200)); });
-    }
-    if (contextParts.length > 0) memoryContext = contextParts.slice(0, 10).join('\n').substring(0, 2000);
+    try {
+      const profile = await cloudMemoryApi('GET', 'FRIDAY/Profile');
+      if (profile && profile.content) contextParts.push('=== FRIDAY Profile ===\n' + profile.content.substring(0, 1000));
+    } catch(e) {}
+
+    if (contextParts.length > 0) memoryContext = (memoryContext || '') + '\n' + contextParts.join('\n');
   } catch(e) { console.log('Memory bootstrap failed:', e.message); }
 }
 
