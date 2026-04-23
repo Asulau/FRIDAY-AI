@@ -2214,21 +2214,63 @@ async function publishToLinkedIn(params) {
 }
 
 async function triggerLeadScraper(params) {
-  const WEBHOOK_URL = 'https://arenzo.app.n8n.cloud/webhook/friday-run-scraper';
+  // Primary: Vibe Prospecting → Google Sheets workflow (Nordic retail, region-aware)
+  const VP_WEBHOOK = 'https://arenzo.app.n8n.cloud/webhook/52dc6da5-ba75-4788-90c5-026b8bfc13fb';
+  const FALLBACK_WEBHOOK = 'https://arenzo.app.n8n.cloud/webhook/friday-run-scraper';
+
+  const body = {
+    source: 'FRIDAY',
+    region: params?.region || 'Nordics',
+    industries: params?.industries || ['Retail', 'Fashion', 'E-commerce'],
+    personas: params?.personas || ['director', 'c-level'],
+    max_results: params?.max_results || 50,
+    note: params?.note || ''
+  };
+
+  // Try primary workflow first
+  let primaryOk = false;
   try {
-    const r = await fetch(WEBHOOK_URL, {
+    const r = await fetch(VP_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: 'FRIDAY', note: params?.note || '' })
+      body: JSON.stringify(body)
     });
-    if (!r.ok) {
+    if (r.ok) {
+      primaryOk = true;
+    } else {
       const txt = await r.text();
-      return { success: false, error: 'Scraper webhook returned ' + r.status + ': ' + txt.substring(0, 200) };
+      console.warn('[Scraper] VP webhook error:', r.status, txt.substring(0, 200));
     }
-    return { success: true, message: 'Scraper triggered. Hunter, Snov.io, Minelead, Prospeo and Apify are now running. Results land in Google Sheets automatically — usually takes 2-3 minutes.' };
   } catch(e) {
-    return { success: false, error: e.message };
+    console.warn('[Scraper] VP webhook failed:', e.message);
   }
+
+  // Try fallback workflow
+  let fallbackOk = false;
+  try {
+    const r2 = await fetch(FALLBACK_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    fallbackOk = r2.ok;
+    if (!r2.ok) console.warn('[Scraper] Fallback webhook error:', r2.status);
+  } catch(e) {
+    console.warn('[Scraper] Fallback webhook failed:', e.message);
+  }
+
+  if (!primaryOk && !fallbackOk) {
+    return {
+      success: false,
+      error: 'Both scraper pipelines failed to respond. The Explorium API credential in n8n may need to be configured. Go to n8n → Credentials and verify the Explorium HTTP Header Auth key is set. Vibe Prospecting credits may also be depleted.'
+    };
+  }
+
+  const which = primaryOk && fallbackOk ? 'both pipelines' : primaryOk ? 'Vibe Prospecting pipeline' : 'fallback pipeline';
+  return {
+    success: true,
+    message: `Scraper triggered via ${which} for ${body.region} region (${body.industries.join(', ')}). Results typically arrive within 2-3 minutes and will appear in the pipeline automatically. Note: if lead count stays at 294, the Explorium API credential in n8n needs to be reconfigured.`
+  };
 }
 
 async function executeAction(name, params) {
@@ -2679,6 +2721,7 @@ function addMsg(type, text, tools) {
 
 // ==================== PROACTIVE FOLLOW-UP ENGINE ====================
 let pendingFollowUps = [];
+const FOLLOWUP_STORAGE_KEY = 'friday_pending_followups';
 
 const FOLLOWUP_PATTERNS = [
   // "within 2-3 minutes" → use max value
@@ -2701,6 +2744,55 @@ function detectFollowUpDelay(text) {
   return null;
 }
 
+function _saveFollowUpsToStorage() {
+  try {
+    const data = pendingFollowUps.map(f => ({
+      id: f.id, fireAt: f.fireAt,
+      fridayText: f.fridayText || '', context: f.context || ''
+    }));
+    localStorage.setItem(FOLLOWUP_STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+function _runFollowUpCheck(id, fridayText) {
+  // Remove indicator from DOM if still there
+  const ind = document.getElementById('followup-' + id);
+  if (ind) ind.remove();
+  pendingFollowUps = pendingFollowUps.filter(f => f.id !== id);
+  _saveFollowUpsToStorage();
+
+  // Show Friday is checking
+  const checkDiv = document.createElement('div');
+  checkDiv.className = 'msg friday';
+  checkDiv.id = 'autonomous-typing-' + id;
+  checkDiv.innerHTML = '<div class="msg-label">F.R.I.D.A.Y.</div><span style="opacity:.6;">◈ Running scheduled check...</span>';
+  document.getElementById('chat').appendChild(checkDiv);
+  document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+
+  const triggerMsg = `[AUTONOMOUS FOLLOW-UP] You said you would check back. Context from your last response: "${(fridayText||'').substring(0, 300)}". Please check now — run whatever tools are needed to follow through — and report the result to Laurence proactively.`;
+
+  conversationHistory.push({ role: 'user', content: triggerMsg });
+  callClaude(triggerMsg).then(result => {
+    const at = document.getElementById('autonomous-typing-' + id);
+    if (at) at.remove();
+    conversationHistory = conversationHistory.filter(m =>
+      !(m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[AUTONOMOUS FOLLOW-UP]'))
+    );
+    orbState = 'speaking';
+    addMsg('friday', '◈ ' + result.text, result.tools);
+    speak(result.text);
+    setTimeout(() => { orbState = 'idle'; }, 4000);
+    if (db) {
+      const tx = db.transaction('history', 'readwrite');
+      tx.objectStore('history').add({ user: '[AUTO CHECK]', friday: result.text, tools: result.tools, time: Date.now() });
+    }
+  }).catch(e => {
+    const at = document.getElementById('autonomous-typing-' + id);
+    if (at) at.remove();
+    addMsg('friday', 'Scheduled check failed: ' + e.message);
+  });
+}
+
 function scheduleFollowUp(fridayText, context) {
   const delay = detectFollowUpDelay(fridayText);
   if (!delay) return;
@@ -2716,51 +2808,41 @@ function scheduleFollowUp(fridayText, context) {
   indicator.innerHTML = `◈ SCHEDULED CHECK — ${mins}m <span style="float:right;cursor:pointer;opacity:.5;" onclick="cancelFollowUp(${id})">✕ cancel</span>`;
   document.getElementById('chat').appendChild(indicator);
 
-  const timer = setTimeout(async () => {
-    // Remove indicator
-    const ind = document.getElementById('followup-' + id);
-    if (ind) ind.remove();
-    pendingFollowUps = pendingFollowUps.filter(f => f.id !== id);
+  const timer = setTimeout(() => _runFollowUpCheck(id, fridayText), delay);
+  pendingFollowUps.push({ id, timer, fireAt, fridayText: fridayText.substring(0, 500), context: (context||'').substring(0, 200) });
+  _saveFollowUpsToStorage();
+}
 
-    // Show Friday is checking
-    const checkDiv = document.createElement('div');
-    checkDiv.className = 'msg friday';
-    checkDiv.id = 'autonomous-typing-' + id;
-    checkDiv.innerHTML = '<div class="msg-label">F.R.I.D.A.Y.</div><span style="opacity:.6;">◈ Running scheduled check...</span>';
-    document.getElementById('chat').appendChild(checkDiv);
-    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+// Called on init — restores any follow-ups that were pending when page was closed
+function restoreFollowUpsFromStorage() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FOLLOWUP_STORAGE_KEY) || '[]');
+    if (!stored.length) return;
+    localStorage.removeItem(FOLLOWUP_STORAGE_KEY); // clear — we'll re-save as we restore
 
-    // Build autonomous trigger message (injected as assistant context, not user visible)
-    const triggerMsg = `[AUTONOMOUS FOLLOW-UP] You said you would check back. Context from your last response: "${fridayText.substring(0, 300)}". Please check now — run whatever tools are needed to follow through — and report the result to Laurence proactively.`;
+    const now = Date.now();
+    stored.forEach(f => {
+      const remaining = f.fireAt - now;
+      const isOverdue = remaining <= 0;
+      const delay = isOverdue ? 4000 : remaining; // fire overdue checks after 4s
+      const mins = Math.ceil(delay / 60000);
 
-    // Inject into conversation as a silent system nudge
-    conversationHistory.push({ role: 'user', content: triggerMsg });
-    let result;
-    try {
-      result = await callClaude(triggerMsg);
-    } catch(e) {
-      result = { text: 'Follow-up check failed: ' + e.message, tools: [] };
-    }
+      // Show indicator
+      const indicator = document.createElement('div');
+      indicator.id = 'followup-' + f.id;
+      indicator.style.cssText = 'font-size:10px;color:var(--cyan-dim,#1a5f6a);padding:4px 12px;opacity:.7;font-family:monospace;letter-spacing:.05em;';
+      indicator.innerHTML = isOverdue
+        ? `◈ RESUMING MISSED CHECK <span style="float:right;cursor:pointer;opacity:.5;" onclick="cancelFollowUp(${f.id})">✕ cancel</span>`
+        : `◈ SCHEDULED CHECK — ${mins}m (restored) <span style="float:right;cursor:pointer;opacity:.5;" onclick="cancelFollowUp(${f.id})">✕ cancel</span>`;
+      document.getElementById('chat').appendChild(indicator);
 
-    const at = document.getElementById('autonomous-typing-' + id);
-    if (at) at.remove();
-
-    // Remove the injected trigger from visible history so chat stays clean
-    conversationHistory = conversationHistory.filter(m =>
-      !(m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[AUTONOMOUS FOLLOW-UP]'))
-    );
-
-    orbState = 'speaking';
-    addMsg('friday', '🔄 ' + result.text, result.tools);
-    speak(result.text);
-    setTimeout(() => { orbState = 'idle'; }, 4000);
-    if (db) {
-      const tx = db.transaction('history', 'readwrite');
-      tx.objectStore('history').add({ user: '[AUTO CHECK]', friday: result.text, tools: result.tools, time: Date.now() });
-    }
-  }, delay);
-
-  pendingFollowUps.push({ id, timer, fireAt });
+      const timer = setTimeout(() => _runFollowUpCheck(f.id, f.fridayText || ''), delay);
+      pendingFollowUps.push({ id: f.id, timer, fireAt: f.fireAt, fridayText: f.fridayText, context: f.context });
+    });
+    _saveFollowUpsToStorage();
+  } catch(e) {
+    localStorage.removeItem(FOLLOWUP_STORAGE_KEY);
+  }
 }
 
 function cancelFollowUp(id) {
@@ -2768,6 +2850,7 @@ function cancelFollowUp(id) {
   if (f) { clearTimeout(f.timer); pendingFollowUps = pendingFollowUps.filter(x => x.id !== id); }
   const ind = document.getElementById('followup-' + id);
   if (ind) ind.remove();
+  _saveFollowUpsToStorage();
 }
 
 async function sendMessage() {
@@ -2925,6 +3008,7 @@ async function init() {
   setInterval(updateClock, 1000);
   await refreshData();
   await Promise.all([loadMemoryContext(), loadLastSession()]);
+  restoreFollowUpsFromStorage();
   requestNotifPermission();
   startNotificationLoop();
   const hour = new Date().getHours();
