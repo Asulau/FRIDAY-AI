@@ -1403,6 +1403,41 @@ const TOOLS = [
     name: 'linkedin_pipeline_status',
     description: 'Get a summary of the full LinkedIn content pipeline — counts by status.',
     input_schema: { type: 'object', properties: {} }
+  },
+
+  // ── Command Center — Reply Detection ────────────────────────────────────
+  {
+    name: 'cc_get_leads',
+    description: 'Get leads from the Command Center, optionally filtered by status (REPLIED, SENT, DRAFTED, BOUNCED, etc.). Use this to audit pipeline health.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by status e.g. REPLIED, SENT, BOUNCED. Omit for all leads.' },
+        limit: { type: 'number', description: 'Max leads to return (default 50)' }
+      }
+    }
+  },
+  {
+    name: 'cc_check_replies',
+    description: 'Audit reply detection: fetch all leads marked as REPLIED in the CC and compare count vs expectations. Surfaces discrepancies between system state and reality.',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'cc_mark_replied',
+    description: 'Mark a specific lead as REPLIED in the Command Center by email address.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'The lead email address to mark as replied' },
+        note: { type: 'string', description: 'Optional note about the reply (e.g. not interested, follow up Q4)' }
+      },
+      required: ['email']
+    }
+  },
+  {
+    name: 'cc_pipeline_status',
+    description: 'Get a full pipeline summary from the Command Center: total leads, counts by status, reply rate, bounce rate.',
+    input_schema: { type: 'object', properties: {} }
   }
 ];
 
@@ -2046,6 +2081,107 @@ async function linkedinPipelineStatus() {
   return { briefs: bCount, posts: pCount, recent: posts.slice(0, 5).map(p => ({ date: p.date, pillar: p.pillar, status: p.status })) };
 }
 
+// ── Command Center — Reply Detection ─────────────────────────────────────────
+const CC_URL = () => settings.ccUrl || 'https://cc.arenzo.io';
+const CC_KEY = 'STARK-779b8576385ed268dd627937628ffb6d';
+
+async function ccApi(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'x-stark-key': CC_KEY }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(CC_URL() + path, opts);
+  if (!r.ok) throw new Error(`CC API ${path} → ${r.status}`);
+  return r.json();
+}
+
+async function ccGetLeads(params = {}) {
+  const leads = await ccApi('/api/leads');
+  const all = Array.isArray(leads) ? leads : (leads.leads || []);
+  let filtered = all;
+  if (params.status) {
+    filtered = all.filter(l => (l.status || '').toUpperCase() === params.status.toUpperCase());
+  }
+  const limit = params.limit || 50;
+  const slice = filtered.slice(0, limit);
+  return {
+    success: true,
+    total: filtered.length,
+    showing: slice.length,
+    status_filter: params.status || 'all',
+    leads: slice.map(l => ({
+      name: l.name, company: l.company, email: l.email,
+      status: l.status, lastEmailStep: l.lastEmailStep, lastEmailDate: l.lastEmailDate
+    }))
+  };
+}
+
+async function ccCheckReplies() {
+  const leads = await ccApi('/api/leads');
+  const all = Array.isArray(leads) ? leads : (leads.leads || []);
+  const replied = all.filter(l => (l.status || '').toUpperCase() === 'REPLIED');
+  const sent = all.filter(l => (l.status || '').toUpperCase() === 'SENT');
+  const bounced = all.filter(l => (l.status || '').toUpperCase() === 'BOUNCED');
+  return {
+    success: true,
+    total_leads: all.length,
+    replied_count: replied.length,
+    sent_count: sent.length,
+    bounced_count: bounced.length,
+    replied_leads: replied.map(l => ({
+      name: l.name, company: l.company, email: l.email,
+      lastEmailStep: l.lastEmailStep, lastEmailDate: l.lastEmailDate
+    })),
+    audit_note: replied.length === 0
+      ? 'No leads marked as REPLIED in system — if you know of a reply, use cc_mark_replied to correct it.'
+      : `${replied.length} lead(s) marked REPLIED. Verify these match your inbox.`
+  };
+}
+
+async function ccMarkReplied(params) {
+  if (!params.email) return { success: false, error: 'email required' };
+  const leads = await ccApi('/api/leads');
+  const all = Array.isArray(leads) ? leads : (leads.leads || []);
+  const lead = all.find(l => (l.email || '').toLowerCase() === params.email.toLowerCase());
+  if (!lead) return { success: false, error: `No lead found with email: ${params.email}` };
+  // PATCH via CC API
+  const r = await fetch(CC_URL() + '/api/leads/' + encodeURIComponent(lead.id || lead.email), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-stark-key': CC_KEY },
+    body: JSON.stringify({ status: 'REPLIED', replyNote: params.note || '' })
+  });
+  return {
+    success: r.ok,
+    lead: lead.name, company: lead.company, email: lead.email,
+    message: r.ok ? `Marked ${lead.name} (${lead.company}) as REPLIED` : `Update failed: ${r.status}`
+  };
+}
+
+async function ccPipelineStatus() {
+  const [stats, leads] = await Promise.all([
+    ccApi('/api/stats').catch(() => null),
+    ccApi('/api/leads')
+  ]);
+  const all = Array.isArray(leads) ? leads : (leads.leads || []);
+  const byStatus = all.reduce((acc, l) => {
+    const s = (l.status || 'UNKNOWN').toUpperCase();
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+  const replied = byStatus['REPLIED'] || 0;
+  const sent = byStatus['SENT'] || 0;
+  const reply_rate = sent > 0 ? ((replied / (sent + replied)) * 100).toFixed(1) + '%' : 'N/A';
+  return {
+    success: true,
+    total_leads: all.length,
+    by_status: byStatus,
+    reply_rate,
+    stats: stats || 'unavailable'
+  };
+}
+
+
 async function publishToLinkedIn(params) {
   const WEBHOOK_URL = 'https://arenzo.app.n8n.cloud/webhook/linkedin-publish';
   try {
@@ -2119,6 +2255,10 @@ async function executeAction(name, params) {
   if (name === 'linkedin_skip_post')       return linkedinSkipPost(params);
   if (name === 'linkedin_mark_published')  return linkedinMarkPublished(params);
   if (name === 'linkedin_pipeline_status') return linkedinPipelineStatus();
+  if (name === 'cc_get_leads')       return ccGetLeads(params);
+  if (name === 'cc_check_replies')   return ccCheckReplies();
+  if (name === 'cc_mark_replied')    return ccMarkReplied(params);
+  if (name === 'cc_pipeline_status') return ccPipelineStatus();
   if (name === 'publish_to_linkedin') return publishToLinkedIn(params);
   if (name === 'trigger_lead_scraper') return triggerLeadScraper(params);
   const actionName = name === 'refresh_data' ? 'refresh_cache' : name;
