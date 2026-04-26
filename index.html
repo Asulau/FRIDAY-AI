@@ -1197,23 +1197,36 @@ let settings = {
 let conversationHistory = [];
 
 function sanitizeHistory(history) {
-  // Remove assistant messages with tool_use not followed by matching tool_result.
+  // Remove orphan tool_use blocks (assistant) and dangling tool_result blocks (user).
   // Prevents Anthropic API 400: "tool_use ids found without tool_result blocks".
   const clean = [];
   for (let i = 0; i < history.length; i++) {
     const msg = history[i];
-    const hasToolUse = msg.role === 'assistant' && Array.isArray(msg.content) &&
+    const isAssistantToolUse = msg.role === 'assistant' && Array.isArray(msg.content) &&
       msg.content.some(b => b.type === 'tool_use');
-    if (hasToolUse) {
+    const isUserToolResult = msg.role === 'user' && Array.isArray(msg.content) &&
+      msg.content.length > 0 && msg.content[0]?.type === 'tool_result';
+
+    if (isAssistantToolUse) {
+      // Keep only if immediately followed by a user tool_result
       const next = history[i + 1];
       const hasResult = next && next.role === 'user' && Array.isArray(next.content) &&
         next.content.some(b => b.type === 'tool_result');
       if (hasResult) { clean.push(msg); }
-      // else: orphaned tool_use — drop it
+      // else: orphaned tool_use — drop it (and the dangling result check below drops the next)
+    } else if (isUserToolResult) {
+      // Keep only if the last clean message was an assistant with tool_use
+      const prev = clean[clean.length - 1];
+      const prevHasToolUse = prev && prev.role === 'assistant' && Array.isArray(prev.content) &&
+        prev.content.some(b => b.type === 'tool_use');
+      if (prevHasToolUse) { clean.push(msg); }
+      // else: dangling tool_result with no preceding tool_use — drop it
     } else {
       clean.push(msg);
     }
   }
+  // Ensure history never starts with an assistant message
+  while (clean.length > 0 && clean[0].role !== 'user') clean.shift();
   return clean;
 }
 
