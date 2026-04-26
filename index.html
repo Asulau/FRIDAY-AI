@@ -4,7 +4,7 @@
 <script>
 // Auto-redirect preview URLs to production
 (function() {
-  const host = window.location.hostname;
+  const host = window.location.hostname
   const prod = 'friday-ai-theta.vercel.app';
   if (host !== prod && host !== 'localhost' && host !== '127.0.0.1' && host.endsWith('.vercel.app')) {
     window.location.replace('https://' + prod + window.location.pathname + window.location.search);
@@ -3631,7 +3631,7 @@ async function callAnthropic(userMessage) {
       const maxLen = block.name.startsWith('web_') ? 6000 : (isMem ? 2000 : 3000);
       toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultStr.length > maxLen ? resultStr.substring(0, maxLen) + '...[truncated]' : resultStr });
     }
-    conversationHistory.push({ role: 'user', content: toolResults });
+    if (toolResults.length > 0) conversationHistory.push({ role: 'user', content: toolResults });
     messages = safeSlice(conversationHistory, 10);
     try {
       const resp2 = await fetchWithRetry('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': settings.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: settings.model, max_tokens: 8192, system: buildSystemPrompt(), tools: TOOLS, messages: messages }) });
