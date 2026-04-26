@@ -4,7 +4,7 @@
 <script>
 // Auto-redirect preview URLs to production
 (function() {
-  const host = window.location.hostname
+  const host = window.location.hostname;
   const prod = 'friday-ai-theta.vercel.app';
   if (host !== prod && host !== 'localhost' && host !== '127.0.0.1' && host.endsWith('.vercel.app')) {
     window.location.replace('https://' + prod + window.location.pathname + window.location.search);
@@ -1196,30 +1196,29 @@ let settings = {
 };
 let conversationHistory = [];
 
-function sanitizeHistory(history) {
-  // Remove assistant messages with tool_use not followed by matching tool_result.
-  // Prevents Anthropic API 400: "tool_use ids found without tool_result blocks".
-  const clean = [];
-  for (let i = 0; i < history.length; i++) {
-    const msg = history[i];
-    const hasToolUse = msg.role === 'assistant' && Array.isArray(msg.content) &&
-      msg.content.some(b => b.type === 'tool_use');
-    if (hasToolUse) {
-      const next = history[i + 1];
-      const hasResult = next && next.role === 'user' && Array.isArray(next.content) &&
-        next.content.some(b => b.type === 'tool_result');
-      if (hasResult) { clean.push(msg); }
-      // else: orphaned tool_use — drop it
+// Remove any trailing assistant messages that have tool_use blocks but no
+// following tool_result — these are left-over from a failed/aborted tool loop
+// and will cause a 400 on the next API call if left in history.
+function fixOrphanToolUse() {
+  while (conversationHistory.length > 0) {
+    const last = conversationHistory[conversationHistory.length - 1];
+    if (last.role === 'assistant' && Array.isArray(last.content) && last.content.some(b => b.type === 'tool_use')) {
+      // Orphan: assistant tool_use with no following user tool_result
+      conversationHistory.pop();
+    } else if (last.role === 'user' && Array.isArray(last.content) && last.content.length > 0 && last.content[0]?.type === 'tool_result') {
+      // Dangling tool_result with no preceding assistant — shouldn't happen, but clean it
+      const prev = conversationHistory[conversationHistory.length - 2];
+      if (!prev || prev.role !== 'assistant') { conversationHistory.pop(); } else { break; }
     } else {
-      clean.push(msg);
+      break;
     }
   }
-  return clean;
 }
 
 function safeSlice(history, n) {
   const sliced = history.slice(-n);
   let start = 0;
+  // Find the latest non-tool_result user message and start from there
   for (let i = 0; i < sliced.length; i++) {
     const msg = sliced[i];
     if (msg.role === 'user') {
@@ -1228,7 +1227,24 @@ function safeSlice(history, n) {
       if (Array.isArray(content) && content[0]?.type !== 'tool_result') { start = i; break; }
     }
   }
-  return sliced.slice(start);
+  const raw = sliced.slice(start);
+
+  // Validate: ensure every assistant tool_use is immediately followed by user tool_result
+  // If not, trim to the last clean exchange boundary
+  const clean = [];
+  for (let i = 0; i < raw.length; i++) {
+    const msg = raw[i];
+    const hasToolUse = msg.role === 'assistant' && Array.isArray(msg.content) && msg.content.some(b => b.type === 'tool_use');
+    if (hasToolUse) {
+      const next = raw[i + 1];
+      const nextIsResult = next && next.role === 'user' && Array.isArray(next.content) && next.content[0]?.type === 'tool_result';
+      if (!nextIsResult) { break; } // truncate — orphan tool_use found
+    }
+    clean.push(msg);
+  }
+  // Ensure we don't start with an assistant message
+  while (clean.length > 0 && clean[0].role !== 'user') clean.shift();
+  return clean;
 }
 
 let statsData = {};
@@ -3628,8 +3644,8 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 }
 
 async function callAnthropic(userMessage) {
+  fixOrphanToolUse(); // clean any orphan tool_use from a previous failed turn
   conversationHistory.push({ role: 'user', content: userMessage });
-  conversationHistory = sanitizeHistory(conversationHistory);
   let messages = safeSlice(conversationHistory, 10);
   let response;
   try {
@@ -3653,14 +3669,13 @@ async function callAnthropic(userMessage) {
       const maxLen = block.name.startsWith('web_') ? 6000 : (isMem ? 2000 : 3000);
       toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultStr.length > maxLen ? resultStr.substring(0, maxLen) + '...[truncated]' : resultStr });
     }
-    if (toolResults.length > 0) conversationHistory.push({ role: 'user', content: toolResults });
-    conversationHistory = sanitizeHistory(conversationHistory);
+    conversationHistory.push({ role: 'user', content: toolResults });
     messages = safeSlice(conversationHistory, 10);
     try {
       const resp2 = await fetchWithRetry('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': settings.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: settings.model, max_tokens: 8192, system: buildSystemPrompt(), tools: TOOLS, messages: messages }) });
-      if (!resp2.ok) { const err = await resp2.text(); return { text: "API error during tool loop (" + resp2.status + "): " + err.substring(0, 200), tools: toolsUsed }; }
+      if (!resp2.ok) { const err = await resp2.text(); fixOrphanToolUse(); return { text: "API error during tool loop (" + resp2.status + "): " + err.substring(0, 200), tools: toolsUsed }; }
       data = await resp2.json();
-    } catch(e) { return { text: "Lost connection during tool execution: " + e.message, tools: toolsUsed }; }
+    } catch(e) { fixOrphanToolUse(); return { text: "Lost connection during tool execution: " + e.message, tools: toolsUsed }; }
   }
   let text = '';
   for (const block of (data.content || [])) { if (block.type === 'text') text += block.text; }
