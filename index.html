@@ -1192,7 +1192,10 @@ let settings = {
   bridgeUrl: 'http://localhost:7823',
   bridgeToken: '',
   notifEnabled: 'on',
-  notifInterval: 30
+  notifInterval: 30,
+  // Off by default — proactive briefing and heartbeat make Claude API calls without
+  // the user typing. Toggle in Settings only if you want autonomous behaviour and accept the spend.
+  autonomousMode: false
 };
 let conversationHistory = [];
 
@@ -4112,6 +4115,7 @@ async function saveSessionSummary() {
 
 async function proactiveBriefing() {
   if (!getActiveKey()) return;
+  if (!settings.autonomousMode) return; // costs an API call — opt-in only
   const briefingPrompt = `Give me a concise morning briefing. Check the CC pipeline status, note when the last email campaign was sent and what follow-ups are due based on the 3-day gap rule. Pull the pipeline summary from SalesHub if available. Surface the single most important thing to act on today. Be direct, max 4 lines. No bullet points.`;
   orbState = 'thinking';
   const typingDiv = document.createElement('div');
@@ -4132,6 +4136,7 @@ async function proactiveBriefing() {
 let _heartbeatTimer = null;
 async function heartbeat() {
   if (!getActiveKey()) return;
+  if (!settings.autonomousMode) return; // costs an API call every interval — opt-in only
   if (orbState !== 'idle') return; // Don't interrupt if already active
   try {
     const prompt = `You are running a silent background check. Look at the current time and any available data (pipeline, CC). Only speak up if there is something genuinely worth flagging right now — an unusual pipeline change, something overdue, or an important pattern. If nothing is notable, respond with exactly the word: SILENT. Otherwise give one short sentence.`;
@@ -4176,10 +4181,15 @@ async function init() {
   if (!getActiveKey()) {
     addMsg('friday', `${greeting}, Sir. I'm online but need my AI core connected. Open Settings (⚙) and enter your API key — Gemini is free at aistudio.google.com/apikey`);
   } else {
-    addMsg('friday', `${greeting}, Sir. Systems online. Scanning what needs your attention...`);
+    const onlineMsg = settings.autonomousMode
+      ? `${greeting}, Sir. Systems online. Scanning what needs your attention...`
+      : `${greeting}, Sir. Systems online. Standing by — autonomous mode OFF (no background API calls). Toggle it in Settings to re-enable proactive briefings.`;
+    addMsg('friday', onlineMsg);
     speak(`${greeting}, Sir. Systems online.`);
-    setTimeout(() => proactiveBriefing(), 1500);
-    startHeartbeat(10); // Check in every 10 minutes and push if anything's notable
+    if (settings.autonomousMode) {
+      setTimeout(() => proactiveBriefing(), 1500);
+      startHeartbeat(10); // Check in every 10 minutes and push if anything's notable
+    }
   }
 }
 
