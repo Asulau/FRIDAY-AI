@@ -1197,30 +1197,45 @@ let settings = {
 let conversationHistory = [];
 
 function sanitizeHistory(history) {
-  // Remove orphan tool_use blocks (assistant) and dangling tool_result blocks (user).
-  // Prevents Anthropic API 400: "tool_use ids found without tool_result blocks".
+  // Walk the history pairing each assistant tool_use block with the matching
+  // tool_result in the very next user message. Strip any unmatched ids on either
+  // side. Prevents Anthropic 400: "tool_use ids found without tool_result blocks".
   const clean = [];
   for (let i = 0; i < history.length; i++) {
     const msg = history[i];
     const isAssistantToolUse = msg.role === 'assistant' && Array.isArray(msg.content) &&
-      msg.content.some(b => b.type === 'tool_use');
+      msg.content.some(b => b && b.type === 'tool_use');
     const isUserToolResult = msg.role === 'user' && Array.isArray(msg.content) &&
-      msg.content.length > 0 && msg.content[0]?.type === 'tool_result';
+      msg.content.some(b => b && b.type === 'tool_result');
 
     if (isAssistantToolUse) {
-      // Keep only if immediately followed by a user tool_result
       const next = history[i + 1];
-      const hasResult = next && next.role === 'user' && Array.isArray(next.content) &&
-        next.content.some(b => b.type === 'tool_result');
-      if (hasResult) { clean.push(msg); }
-      // else: orphaned tool_use — drop it (and the dangling result check below drops the next)
+      const nextResultIds = (next && next.role === 'user' && Array.isArray(next.content))
+        ? new Set(next.content.filter(b => b && b.type === 'tool_result').map(b => b.tool_use_id))
+        : new Set();
+      // Keep only tool_use blocks that have a matching tool_result in the next user message
+      const newContent = msg.content.filter(b => !b || b.type !== 'tool_use' || nextResultIds.has(b.id));
+      const stillHasToolUse = newContent.some(b => b && b.type === 'tool_use');
+      if (stillHasToolUse) {
+        clean.push({ ...msg, content: newContent });
+      } else {
+        // No matched tool_use survived; preserve any text content so the assistant turn isn't lost
+        const textOnly = newContent.filter(b => b && b.type === 'text');
+        if (textOnly.length > 0) clean.push({ ...msg, content: textOnly });
+        // else: drop the assistant message entirely
+      }
     } else if (isUserToolResult) {
-      // Keep only if the last clean message was an assistant with tool_use
       const prev = clean[clean.length - 1];
-      const prevHasToolUse = prev && prev.role === 'assistant' && Array.isArray(prev.content) &&
-        prev.content.some(b => b.type === 'tool_use');
-      if (prevHasToolUse) { clean.push(msg); }
-      // else: dangling tool_result with no preceding tool_use — drop it
+      const prevToolUseIds = (prev && prev.role === 'assistant' && Array.isArray(prev.content))
+        ? new Set(prev.content.filter(b => b && b.type === 'tool_use').map(b => b.id))
+        : new Set();
+      // Keep only tool_result blocks whose id matches a tool_use in the preceding assistant
+      const newContent = msg.content.filter(b => !b || b.type !== 'tool_result' || prevToolUseIds.has(b.tool_use_id));
+      const hasResult = newContent.some(b => b && b.type === 'tool_result');
+      if (hasResult) {
+        clean.push({ ...msg, content: newContent });
+      }
+      // else: every tool_result was orphaned — drop the user message
     } else {
       clean.push(msg);
     }
@@ -3655,18 +3670,28 @@ async function callAnthropic(userMessage) {
   while (data.stop_reason === 'tool_use' && iterations < 25) {
     iterations++;
     conversationHistory.push({ role: 'assistant', content: data.content });
+    // Build a tool_result for EVERY tool_use in the assistant message — even if executeAction
+    // or JSON.stringify throws. Anthropic's API requires 1:1 pairing or it returns 400.
+    const toolUseBlocks = (data.content || []).filter(b => b && b.type === 'tool_use');
     const toolResults = [];
-    for (const block of data.content) {
-      if (block.type !== 'tool_use') continue;
+    for (const block of toolUseBlocks) {
       toolsUsed.push(block.name);
-      let result;
-      try { result = await executeAction(block.name, block.input); } catch(e) { result = { success: false, error: e.message }; }
-      const resultStr = JSON.stringify(result);
+      let resultStr;
+      try {
+        const result = await executeAction(block.name, block.input);
+        try { resultStr = JSON.stringify(result); }
+        catch (e) { resultStr = JSON.stringify({ success: false, error: 'unserializable result: ' + (e && e.message) }); }
+      } catch (e) {
+        resultStr = JSON.stringify({ success: false, error: (e && e.message) || String(e) });
+      }
+      if (typeof resultStr !== 'string') resultStr = String(resultStr);
       const isMem = block.name.startsWith('memory_');
       const maxLen = block.name.startsWith('web_') ? 6000 : (isMem ? 2000 : 3000);
       toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultStr.length > maxLen ? resultStr.substring(0, maxLen) + '...[truncated]' : resultStr });
     }
-    if (toolResults.length > 0) conversationHistory.push({ role: 'user', content: toolResults });
+    // Always push paired tool_results (even if empty array) so we never have
+    // a dangling assistant tool_use without a matching user tool_result message.
+    if (toolUseBlocks.length > 0) conversationHistory.push({ role: 'user', content: toolResults });
     conversationHistory = sanitizeHistory(conversationHistory);
     messages = safeSlice(conversationHistory, 10);
     try {
