@@ -1796,6 +1796,9 @@ async function loadSettings() {
     Object.keys(saved).forEach(k => {
       if (saved[k] !== '' && saved[k] !== null && saved[k] !== undefined) settings[k] = saved[k];
     });
+    // SAFETY: force autonomousMode off on every load. Stale localStorage with autonomousMode: true
+    // was firing heartbeats every 10 minutes and burning Anthropic credits. Re-enable explicitly.
+    settings.autonomousMode = false;
     persistSettings();
   }
   document.getElementById('set-provider').value = settings.provider || 'anthropic';
@@ -3721,7 +3724,16 @@ async function callAnthropic(userMessage) {
   try {
     response = await fetchWithRetry('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': settings.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: settings.model, max_tokens: 4096, system: buildSystemPrompt(), tools: TOOLS, messages: messages }) });
   } catch(e) { return { text: "Connection error, Sir: " + e.message, tools: [] }; }
-  if (!response.ok) { const err = await response.text(); return { text: "API error (" + response.status + "): " + err.substring(0, 200), tools: [] }; }
+  if (!response.ok) {
+    const err = await response.text();
+    if (response.status === 400 && /tool_use|tool_result/i.test(err)) {
+      // Conversation history is in a bad state — wipe it so the next message starts clean
+      conversationHistory = [];
+      try { if (db) { const tx = db.transaction('history','readwrite'); tx.objectStore('history').clear(); } } catch(e) {}
+      return { text: "⚠️ Conversation history was corrupted — cleared automatically. Send your message again.", tools: [] };
+    }
+    return { text: "API error (" + response.status + "): " + err.substring(0, 200), tools: [] };
+  }
   let data = await response.json();
   let toolsUsed = [];
   let iterations = 0;
@@ -3754,7 +3766,14 @@ async function callAnthropic(userMessage) {
     messages = safeSlice(conversationHistory, 10);
     try {
       const resp2 = await fetchWithRetry('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': settings.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: settings.model, max_tokens: 8192, system: buildSystemPrompt(), tools: TOOLS, messages: messages }) });
-      if (!resp2.ok) { const err = await resp2.text(); return { text: "API error during tool loop (" + resp2.status + "): " + err.substring(0, 200), tools: toolsUsed }; }
+      if (!resp2.ok) {
+        const err = await resp2.text();
+        if (resp2.status === 400 && /tool_use|tool_result/i.test(err)) {
+          conversationHistory = [];
+          return { text: "⚠️ Conversation history was corrupted mid-tool-loop — cleared. Try again.", tools: toolsUsed };
+        }
+        return { text: "API error during tool loop (" + resp2.status + "): " + err.substring(0, 200), tools: toolsUsed };
+      }
       data = await resp2.json();
     } catch(e) { return { text: "Lost connection during tool execution: " + e.message, tools: toolsUsed }; }
   }
@@ -4225,7 +4244,11 @@ async function init() {
   setInterval(updateClock, 1000);
   await refreshData();
   await Promise.all([loadMemoryContext(), loadLastSession()]);
-  restoreFollowUpsFromStorage();
+  // Clear any stale pending follow-ups instead of restoring them — they were firing auto callClaude
+  // on broken conversation history, generating recurring 400 errors and burning credits.
+  try { localStorage.removeItem('FRIDAY_PENDING_FOLLOWUPS'); } catch(e) {}
+  try { localStorage.removeItem(typeof FOLLOWUP_STORAGE_KEY !== 'undefined' ? FOLLOWUP_STORAGE_KEY : 'FRIDAY_PENDING_FOLLOWUPS'); } catch(e) {}
+  // restoreFollowUpsFromStorage();  // disabled — see above
   // Proactive OOO check — runs on startup, silently checks for leads due back
   setTimeout(proactiveOOOCheck, 8000);
   // Auto-followup — runs Mon-Fri ≥9am once per day. Fires on load and every 30 min while open.
@@ -4244,10 +4267,13 @@ async function init() {
       : `${greeting}, Sir. Systems online. Standing by — autonomous mode OFF (no background API calls). Toggle it in Settings to re-enable proactive briefings.`;
     addMsg('friday', onlineMsg);
     speak(`${greeting}, Sir. Systems online.`);
-    if (settings.autonomousMode) {
-      setTimeout(() => proactiveBriefing(), 1500);
-      startHeartbeat(10); // Check in every 10 minutes and push if anything's notable
-    }
+    // HARD DISABLED — autonomousMode used to start a setInterval(heartbeat, 10min) here, but
+    // it ran away with 400 errors and cost Anthropic credits. Even with the flag check there
+    // was a pathway to get it running. To re-enable manually: startHeartbeat(10) in console.
+    // if (settings.autonomousMode) {
+    //   setTimeout(() => proactiveBriefing(), 1500);
+    //   startHeartbeat(10);
+    // }
   }
 }
 
