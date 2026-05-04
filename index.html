@@ -1195,7 +1195,11 @@ let settings = {
   notifInterval: 30,
   // Off by default — proactive briefing and heartbeat make Claude API calls without
   // the user typing. Toggle in Settings only if you want autonomous behaviour and accept the spend.
-  autonomousMode: false
+  autonomousMode: false,
+  // Auto-followup runs Mon-Fri ~9am local: hits leadfinder send_next_step with limit 50 and
+  // 3-business-day cooldown so any overdue lead gets the next sequence step automatically.
+  // Doesn't call Claude — pure leadfinder API → n8n → Gmail. Default ON because user opted in.
+  autoFollowup: true
 };
 let conversationHistory = [];
 
@@ -2332,6 +2336,57 @@ async function listOOOLeads() {
 }
 
 // ── Proactive OOO daily check ─────────────────────────────────────────────────
+// Runs every page load + every 30 min — checks if it's Mon-Fri ≥9am local AND
+// today's auto-followup hasn't run yet. If so, calls leadfinder send_next_step.
+// Self-throttling via localStorage so it can't double-fire even if the tab is reloaded.
+// No Claude API calls — pure leadfinder→n8n→Gmail pipeline. 50/day cap, 3-business-day
+// cooldown. Disable with settings.autoFollowup = false.
+async function morningAutoFollowup() {
+  if (!settings.autoFollowup) return;
+  if (!settings.ccUrl) return;
+  const now = new Date();
+  const dow = now.getDay();              // 0=Sun, 6=Sat
+  if (dow === 0 || dow === 6) return;    // skip weekends
+  if (now.getHours() < 9) return;        // wait until 9am local
+  const today = now.toISOString().slice(0, 10);
+  const last = (typeof localStorage !== 'undefined') ? (localStorage.getItem('autoFollowup_lastRun') || '') : '';
+  if (last === today) return;            // already ran today
+
+  // Mark as running BEFORE the call — prevents double-fire on a tab refresh during the request
+  try { localStorage.setItem('autoFollowup_lastRun', today); } catch(e) {}
+
+  try {
+    const r = await fetch(settings.ccUrl + '/api/action', {
+      method: 'POST',
+      headers: ccHeaders(),
+      body: JSON.stringify({ action: 'send_next_step', params: { businessDays: 3, limit: 50 } })
+    });
+    const result = await r.json();
+    if (result && result.success) {
+      const sent = result.sent || 0;
+      const totalDue = result.totalDue || 0;
+      const remaining = result.remaining || 0;
+      const errs = (result.results || []).filter(x => x.status === 'error').length;
+      let msg = `🤖 **Morning auto-followup** — sent ${sent} follow-up${sent !== 1 ? 's' : ''} to overdue leads (3-business-day cooldown, 50/day cap).`;
+      if (remaining > 0) msg += ` ${remaining} more queued for tomorrow.`;
+      if (errs > 0)     msg += ` ${errs} send error${errs !== 1 ? 's' : ''} — check the pipeline.`;
+      if (sent === 0 && totalDue === 0) msg = `🤖 **Morning auto-followup** — no leads overdue today, nothing to send.`;
+      addMsg('friday', msg);
+      try { speak('Morning auto-followup complete.'); } catch(e) {}
+      try { memoryStore({ title: 'Auto-Followup ' + today, content: 'Sent ' + sent + '/' + totalDue + ' overdue follow-ups (cap 50, cooldown 3bd). Errors: ' + errs + '.' }); } catch(e) {}
+      try { refreshData(); } catch(e) {}
+    } else {
+      const errMsg = (result && (result.error || result.message)) || 'unknown';
+      addMsg('friday', '⚠️ Auto-followup did not run: ' + errMsg);
+      // Roll back the lock so we can retry on next interval
+      try { localStorage.removeItem('autoFollowup_lastRun'); } catch(e) {}
+    }
+  } catch (e) {
+    addMsg('friday', '⚠️ Auto-followup error: ' + (e && e.message ? e.message : e));
+    try { localStorage.removeItem('autoFollowup_lastRun'); } catch(e) {}
+  }
+}
+
 // Runs once on startup and then daily — checks for OOO leads due back today
 async function proactiveOOOCheck() {
   if (!settings.ccUrl) return;
@@ -4173,6 +4228,9 @@ async function init() {
   restoreFollowUpsFromStorage();
   // Proactive OOO check — runs on startup, silently checks for leads due back
   setTimeout(proactiveOOOCheck, 8000);
+  // Auto-followup — runs Mon-Fri ≥9am once per day. Fires on load and every 30 min while open.
+  setTimeout(morningAutoFollowup, 12000);
+  setInterval(morningAutoFollowup, 30 * 60 * 1000);
   requestNotifPermission();
   startNotificationLoop();
   const hour = new Date().getHours();
