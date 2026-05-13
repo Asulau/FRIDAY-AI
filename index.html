@@ -204,6 +204,58 @@ body::after {
 .stat-val.red { color: var(--red); }
 .stat-val.orange { color: var(--gold); text-shadow: 0 0 8px var(--gold-glow); }
 
+/* ── Agents panel ── */
+.agent-row > span:first-child {
+  font-size: 10px;
+  color: var(--text-secondary);
+  letter-spacing: 0.4px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-run {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  background: rgba(56,232,255,0.08);
+  border: 1px solid rgba(56,232,255,0.35);
+  color: var(--cyan);
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+  text-shadow: 0 0 6px var(--cyan-glow);
+}
+.agent-run:hover {
+  background: rgba(56,232,255,0.18);
+  box-shadow: 0 0 10px rgba(56,232,255,0.35);
+}
+.agent-run:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.agent-input-row {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.agent-input-row input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(56,232,255,0.3);
+  color: var(--cyan);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  outline: none;
+}
+.agent-input-row input:focus { border-color: var(--cyan); }
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN AREA
    ═══════════════════════════════════════════════════════════════ */
@@ -893,9 +945,6 @@ body::after {
   <div class="panel-box">
     <div class="panel-title">Connectors</div>
     <div class="stat-row"><span>Command Center</span><span class="stat-val" id="cc-status">--</span></div>
-    <div class="stat-row"><span>Google Cal</span><span class="stat-val red" id="gcal-status">OFFLINE</span></div>
-    <div class="stat-row"><span>Gmail</span><span class="stat-val red" id="gmail-status">OFFLINE</span></div>
-    <div class="stat-row"><span>Outlook</span><span class="stat-val red" id="outlook-status">OFFLINE</span></div>
     <div class="stat-row"><span>Web Search</span><span class="stat-val red" id="web-status">OFFLINE</span></div>
     <div class="stat-row"><span>Memory</span><span class="stat-val red" id="obsidian-status">OFFLINE</span></div>
     <div class="stat-row"><span>SalesHub</span><span class="stat-val orange" id="saleshub-status">--</span></div>
@@ -914,6 +963,20 @@ body::after {
     <div class="panel-title">Memory</div>
     <div class="stat-row"><span>Messages</span><span class="stat-val" id="mem-msgs">0</span></div>
     <div class="stat-row"><span>Sessions</span><span class="stat-val" id="mem-sessions">0</span></div>
+  </div>
+  <div class="panel-box">
+    <div class="panel-title" onclick="toggleAgents()" style="cursor:pointer;user-select:none;">
+      <span>Agents</span>
+    </div>
+    <div id="agents-body">
+      <div class="stat-row agent-row"><span>Deliverability Guardian</span><button class="agent-run" onclick="runAgent('check_deliverability')">RUN</button></div>
+      <div class="stat-row agent-row"><span>Champion Tracker</span><button class="agent-run" onclick="runAgent('track_job_changes')">RUN</button></div>
+      <div class="stat-row agent-row"><span>Signal Leads</span><button class="agent-run" onclick="runAgent('find_signal_leads')">RUN</button></div>
+      <div class="stat-row agent-row"><span>Visitor De-Anon</span><button class="agent-run" onclick="runAgent('list_visitor_leads')">RUN</button></div>
+      <div class="stat-row agent-row"><span>LinkedIn Outreach</span><button class="agent-run" onclick="runAgentWithInput('linkedin_warm_outreach','profileUrls','LinkedIn profile URLs (comma-separated)',true)">RUN</button></div>
+      <div class="stat-row agent-row"><span>Competitor Intel</span><button class="agent-run" onclick="runAgentWithInput('competitor_intel','competitors','Competitor names or domains (comma-separated)',true)">RUN</button></div>
+      <div class="stat-row agent-row"><span>SEO Content</span><button class="agent-run" onclick="runAgentWithInput('generate_seo_content','keyword','Target keyword',false)">RUN</button></div>
+    </div>
   </div>
 </div>
 
@@ -2379,15 +2442,89 @@ async function morningAutoFollowup() {
       try { memoryStore({ title: 'Auto-Followup ' + today, content: 'Sent ' + sent + '/' + totalDue + ' overdue follow-ups (cap 50, cooldown 3bd). Errors: ' + errs + '.' }); } catch(e) {}
       try { refreshData(); } catch(e) {}
     } else {
-      const errMsg = (result && (result.error || result.message)) || 'unknown';
-      addMsg('friday', '⚠️ Auto-followup did not run: ' + errMsg);
-      // Roll back the lock so we can retry on next interval
+      // Silent failure — surface to console only, never to chat (was spamming user every 30 min)
+      try { console.warn('[auto-followup] did not run:', (result && (result.error || result.message)) || 'unknown'); } catch(e) {}
       try { localStorage.removeItem('autoFollowup_lastRun'); } catch(e) {}
     }
   } catch (e) {
-    addMsg('friday', '⚠️ Auto-followup error: ' + (e && e.message ? e.message : e));
-    try { localStorage.removeItem('autoFollowup_lastRun'); } catch(e) {}
+    // Silent failure — network/fetch errors used to surface as "⚠️ Auto-followup error: Failed to fetch"
+    try { console.warn('[auto-followup] error:', e && e.message ? e.message : e); } catch(_) {}
+    try { localStorage.removeItem('autoFollowup_lastRun'); } catch(_) {}
   }
+}
+
+// ── Sidebar Agents ──────────────────────────────────────────────────────────
+// Each agent is a button in the left sidebar that hits the leadfinder /api/action
+// endpoint with a specific action name. Results land in the chat as a system message.
+const AGENT_BASE_URL = 'https://leadfinder-rho.vercel.app';
+function _agentBaseUrl() {
+  return (settings && settings.ccUrl) ? settings.ccUrl.replace(/\/$/, '') : AGENT_BASE_URL;
+}
+function toggleAgents() {
+  const body = document.getElementById('agents-body');
+  if (!body) return;
+  body.style.display = (body.style.display === 'none') ? '' : 'none';
+}
+async function _postAgent(action, params, btn) {
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  const label = action.replace(/_/g, ' ');
+  addMsg('friday', `⚙ Running agent: **${label}**${params ? ' · params: ' + JSON.stringify(params) : ''}`);
+  try {
+    const body = params ? { action, params } : { action };
+    const r = await fetch(_agentBaseUrl() + '/api/action', {
+      method: 'POST',
+      headers: ccHeaders(),
+      body: JSON.stringify(body)
+    });
+    const text = await r.text();
+    let parsed; try { parsed = JSON.parse(text); } catch(e) { parsed = text; }
+    const pretty = (typeof parsed === 'string') ? parsed : JSON.stringify(parsed, null, 2);
+    const trimmed = pretty.length > 4000 ? pretty.slice(0, 4000) + '\n…[truncated]' : pretty;
+    addMsg('friday', `✅ **${label}** result:<pre style="white-space:pre-wrap;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7ee787;background:rgba(0,0,0,.35);padding:8px;border-radius:4px;margin-top:6px;overflow:auto;max-height:280px;">${trimmed.replace(/</g,'&lt;')}</pre>`);
+  } catch (e) {
+    addMsg('friday', `⚠️ **${label}** failed: ${e && e.message ? e.message : e}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = original; }
+  }
+}
+function runAgent(action) {
+  const btn = (typeof event !== 'undefined' && event && event.target) ? event.target : null;
+  _postAgent(action, null, btn);
+}
+function runAgentWithInput(action, paramKey, placeholder, isList) {
+  const btn = (typeof event !== 'undefined' && event && event.target) ? event.target : null;
+  const row = btn ? btn.closest('.agent-row') : null;
+  if (!row) return;
+  // Toggle: clicking RUN again while the input is open removes it
+  const existing = row.nextElementSibling;
+  if (existing && existing.classList && existing.classList.contains('agent-input-row') && existing.dataset.for === action) {
+    existing.remove();
+    return;
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'agent-input-row';
+  wrap.dataset.for = action;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = placeholder;
+  const go = document.createElement('button');
+  go.className = 'agent-run';
+  go.textContent = 'GO';
+  const submit = () => {
+    const raw = (input.value || '').trim();
+    if (!raw) { input.focus(); return; }
+    const value = isList ? raw.split(',').map(s => s.trim()).filter(Boolean) : raw;
+    const params = { [paramKey]: value };
+    wrap.remove();
+    _postAgent(action, params, btn);
+  };
+  go.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); else if (e.key === 'Escape') wrap.remove(); });
+  wrap.appendChild(input);
+  wrap.appendChild(go);
+  row.parentNode.insertBefore(wrap, row.nextSibling);
+  input.focus();
 }
 
 // Runs once on startup and then daily — checks for OOO leads due back today
@@ -3524,13 +3661,13 @@ function updatePanels(ccOnline) {
 
   const gmailEl = document.getElementById('gmail-status');
   const dotGmail = document.getElementById('dot-gmail');
-  if (settings.gmailToken) { gmailEl.textContent = 'ONLINE'; gmailEl.className = 'stat-val green'; dotGmail.className = 'dot online'; }
-  else { gmailEl.textContent = 'OFFLINE'; gmailEl.className = 'stat-val red'; dotGmail.className = 'dot'; }
+  if (settings.gmailToken) { if (gmailEl) { gmailEl.textContent = 'ONLINE'; gmailEl.className = 'stat-val green'; } if (dotGmail) dotGmail.className = 'dot online'; }
+  else { if (gmailEl) { gmailEl.textContent = 'OFFLINE'; gmailEl.className = 'stat-val red'; } if (dotGmail) dotGmail.className = 'dot'; }
 
   const outlookEl = document.getElementById('outlook-status');
   const dotOutlook = document.getElementById('dot-outlook');
-  if (settings.outlookToken) { outlookEl.textContent = 'ONLINE'; outlookEl.className = 'stat-val green'; dotOutlook.className = 'dot online'; }
-  else { outlookEl.textContent = 'OFFLINE'; outlookEl.className = 'stat-val red'; dotOutlook.className = 'dot'; }
+  if (settings.outlookToken) { if (outlookEl) { outlookEl.textContent = 'ONLINE'; outlookEl.className = 'stat-val green'; } if (dotOutlook) dotOutlook.className = 'dot online'; }
+  else { if (outlookEl) { outlookEl.textContent = 'OFFLINE'; outlookEl.className = 'stat-val red'; } if (dotOutlook) dotOutlook.className = 'dot'; }
 
   // LinkedIn Manager status check
   const liEl = document.getElementById('linkedin-mgr-status');
